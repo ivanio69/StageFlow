@@ -1,0 +1,39 @@
+name: Build StageFlow
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Show schemes
+        run: xcodebuild -project StageFlow.xcodeproj -list
+
+      - name: Build iOS app
+        run: |
+          set -o pipefail
+          xcodebuild             -project StageFlow.xcodeproj             -scheme StageFlow             -configuration Debug             -destination 'generic/platform=iOS Simulator'             CODE_SIGNING_ALLOWED=NO             build
+
+      - name: Build watchOS app
+        run: |
+          set -o pipefail
+          xcodebuild             -project StageFlow.xcodeproj             -scheme StageFlowWatch             -configuration Debug             -destination 'generic/platform=watchOS Simulator'             CODE_SIGNING_ALLOWED=NO             build
