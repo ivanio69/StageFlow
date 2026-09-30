@@ -12,7 +12,9 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
 
     override init() {
         super.init()
+
         guard WCSession.isSupported() else { return }
+
         WCSession.default.delegate = self
         WCSession.default.activate()
     }
@@ -35,8 +37,20 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
         )
     }
 
+    func skipNextBlock() {
+        send(
+            WatchCommand(
+                rehearsalID: snapshot.rehearsalID,
+                action: .skipNextBlock
+            )
+        )
+    }
+
     func addNote(_ text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = text.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
         guard !trimmed.isEmpty else { return }
 
         send(
@@ -49,7 +63,10 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
         )
     }
 
-    private func send(_ command: WatchCommand, allowQueuedDelivery: Bool = false) {
+    private func send(
+        _ command: WatchCommand,
+        allowQueuedDelivery: Bool = false
+    ) {
         guard WCSession.isSupported(),
               WCSession.default.activationState == .activated,
               let data = try? JSONEncoder().encode(command) else {
@@ -60,7 +77,17 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
         let payload: [String: Any] = ["command": data]
 
         if WCSession.default.isReachable {
-            WCSession.default.sendMessage(payload, replyHandler: nil)
+            WCSession.default.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler: { [weak self] _ in
+                    Task { @MainActor in
+                        self?.statusMessage = "Не удалось отправить"
+                        WKInterfaceDevice.current().play(.failure)
+                    }
+                }
+            )
+
             statusMessage = "Отправлено"
             WKInterfaceDevice.current().play(.click)
             return
@@ -90,23 +117,36 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
         }
     }
 
-    nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
+    nonisolated func sessionReachabilityDidChange(
+        _ session: WCSession
+    ) {
         Task { @MainActor in
             isPhoneReachable = session.isReachable
         }
     }
 
-    nonisolated func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+    nonisolated func session(
+        _ session: WCSession,
+        didReceiveApplicationContext applicationContext: [String: Any]
+    ) {
         handle(applicationContext)
     }
 
-    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+    nonisolated func session(
+        _ session: WCSession,
+        didReceiveMessage message: [String: Any]
+    ) {
         handle(message)
     }
 
-    nonisolated private func handle(_ payload: [String: Any]) {
+    nonisolated private func handle(
+        _ payload: [String: Any]
+    ) {
         guard let data = payload["snapshot"] as? Data,
-              let decoded = try? JSONDecoder().decode(WatchSnapshot.self, from: data) else {
+              let decoded = try? JSONDecoder().decode(
+                WatchSnapshot.self,
+                from: data
+              ) else {
             return
         }
 
