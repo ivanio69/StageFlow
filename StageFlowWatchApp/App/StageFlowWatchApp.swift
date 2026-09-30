@@ -6,7 +6,7 @@ struct StageFlowWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            CurrentBlockView(snapshot: session.snapshot)
+            CurrentBlockView(session: session)
         }
     }
 }
