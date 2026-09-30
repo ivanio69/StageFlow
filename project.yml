@@ -31,6 +31,7 @@ targets:
         embed: true
       - target: StageFlowLiveActivity
         embed: true
+
   StageFlowWatch:
     type: application
     platform: watchOS
@@ -43,15 +44,23 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: StageFlow
         INFOPLIST_KEY_WKApplication: YES
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.stageflow999.app
+
   StageFlowLiveActivity:
     type: app-extension
     platform: iOS
     sources:
       - path: StageFlowLiveActivity
+        excludes:
+          - Info.plist
       - path: StageFlowLiveActivityShared
+    info:
+      path: StageFlowLiveActivity/Info.plist
+      properties:
+        CFBundleDisplayName: StageFlow
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.stageflow999.app.liveactivity
-        INFOPLIST_KEY_CFBundleDisplayName: StageFlow
-        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
