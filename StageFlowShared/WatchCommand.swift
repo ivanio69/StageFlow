@@ -3,6 +3,7 @@ import Foundation
 enum WatchCommandAction: String, Codable {
     case startNextBlock
     case finishCurrentBlock
+    case skipNextBlock
     case addNote
 }
 
