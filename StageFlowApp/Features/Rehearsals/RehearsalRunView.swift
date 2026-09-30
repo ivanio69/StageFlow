@@ -28,9 +28,11 @@ struct RehearsalRunView: View {
                             Text("РЕПЕТИЦИЯ")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(.secondary)
+
                             Text(rehearsal.title)
                                 .font(.title2.bold())
                         }
+
                         Spacer()
                         TimeDeltaBadge(seconds: delta)
                     }
@@ -41,8 +43,12 @@ struct RehearsalRunView: View {
                         Text("Прогноз окончания")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text(ScheduleEngine.predictedFinish(in: rehearsal, now: now).formatted(date: .omitted, time: .shortened))
-                            .font(.system(size: 42, weight: .bold, design: .rounded))
+
+                        Text(
+                            ScheduleEngine.predictedFinish(in: rehearsal, now: now)
+                                .formatted(date: .omitted, time: .shortened)
+                        )
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
                     }
 
                     quickNote
@@ -52,10 +58,23 @@ struct RehearsalRunView: View {
                             Text("Далее")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+
                             Text(next.title)
                                 .font(.headline)
-                            Text(next.plannedStart.formatted(date: .omitted, time: .shortened))
-                                .foregroundStyle(.secondary)
+
+                            let projected = ScheduleEngine.projectedStart(
+                                for: next,
+                                in: rehearsal,
+                                now: now
+                            )
+
+                            HStack(spacing: 6) {
+                                Text("План \(next.plannedStart.formatted(date: .omitted, time: .shortened))")
+                                Text("→")
+                                Text("~\(projected.formatted(date: .omitted, time: .shortened))")
+                            }
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(delta > 30 ? .orange : (delta < -30 ? .green : .secondary))
                         }
                     }
                 }
@@ -64,7 +83,9 @@ struct RehearsalRunView: View {
             .background(Color.black.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Закрыть", systemImage: "xmark") { dismiss() }
+                    Button("Закрыть", systemImage: "xmark") {
+                        dismiss()
+                    }
                 }
             }
         }
@@ -72,12 +93,16 @@ struct RehearsalRunView: View {
         .task {
             PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
             await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal, now: now)
+
             var ticks = 0
+
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 now = Date()
                 ticks += 1
+
                 if ticks % 30 == 0 {
+                    PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
                     await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal, now: now)
                 }
             }
@@ -91,9 +116,36 @@ struct RehearsalRunView: View {
                 Text(running.title)
                     .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                Text("\(running.plannedStart.formatted(date: .omitted, time: .shortened))–\(running.plannedEnd.formatted(date: .omitted, time: .shortened))")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text("План")
+                        .foregroundStyle(.secondary)
+
+                    Text(
+                        "\(running.plannedStart.formatted(date: .omitted, time: .shortened))–\(running.plannedEnd.formatted(date: .omitted, time: .shortened))"
+                    )
+                    .monospacedDigit()
+                }
+                .font(.subheadline)
+
+                if let actualStart = running.actualStart {
+                    let projectedEnd = ScheduleEngine.projectedEnd(
+                        for: running,
+                        in: rehearsal,
+                        now: now
+                    )
+
+                    HStack(spacing: 8) {
+                        Text("Факт")
+                            .foregroundStyle(.secondary)
+                        Text(actualStart.formatted(date: .omitted, time: .shortened))
+                            .monospacedDigit()
+                        Text("→")
+                            .foregroundStyle(.secondary)
+                        Text("~\(projectedEnd.formatted(date: .omitted, time: .shortened))")
+                            .monospacedDigit()
+                    }
+                    .font(.subheadline)
+                }
 
                 Button {
                     finish(running)
@@ -111,8 +163,22 @@ struct RehearsalRunView: View {
             VStack(alignment: .leading, spacing: 18) {
                 Text(next.title)
                     .font(.system(size: 34, weight: .bold, design: .rounded))
-                Text("Старт по плану в \(next.plannedStart.formatted(date: .omitted, time: .shortened))")
-                    .foregroundStyle(.secondary)
+
+                let projectedStart = ScheduleEngine.projectedStart(
+                    for: next,
+                    in: rehearsal,
+                    now: now
+                )
+
+                if abs(delta) >= 30 {
+                    Text(
+                        "План \(next.plannedStart.formatted(date: .omitted, time: .shortened)) · прогноз ~\(projectedStart.formatted(date: .omitted, time: .shortened))"
+                    )
+                    .foregroundStyle(delta > 0 ? .orange : .green)
+                } else {
+                    Text("Старт по плану в \(next.plannedStart.formatted(date: .omitted, time: .shortened))")
+                        .foregroundStyle(.secondary)
+                }
 
                 Button {
                     start(next)
@@ -127,7 +193,11 @@ struct RehearsalRunView: View {
             .padding(20)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
         } else {
-            ContentUnavailableView("На сегодня всё", systemImage: "checkmark.seal.fill")
+            ContentUnavailableView(
+                "На сегодня всё",
+                systemImage: "checkmark.seal.fill",
+                description: Text("Репетиция завершена.")
+            )
         }
     }
 
@@ -136,13 +206,21 @@ struct RehearsalRunView: View {
             Text("Быстрая заметка")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
             HStack(alignment: .bottom) {
                 TextField("Что нужно исправить?", text: $noteText, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
+
                 Button("Добавить", systemImage: "plus") {
                     let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmed.isEmpty else { return }
-                    rehearsal.notes.append(RehearsalNote(text: trimmed, blockID: running?.id))
+
+                    rehearsal.notes.append(
+                        RehearsalNote(
+                            text: trimmed,
+                            blockID: running?.id
+                        )
+                    )
                     noteText = ""
                 }
                 .labelStyle(.iconOnly)
@@ -152,24 +230,41 @@ struct RehearsalRunView: View {
     }
 
     private func start(_ block: RehearsalBlock) {
-        if rehearsal.actualStart == nil { rehearsal.actualStart = Date() }
-        block.actualStart = Date()
+        let now = Date()
+
+        if rehearsal.actualStart == nil {
+            rehearsal.actualStart = now
+        }
+
+        block.actualStart = now
         block.status = .running
+
         PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
-        Task { await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal) }
+        Task {
+            await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal)
+        }
     }
 
     private func finish(_ block: RehearsalBlock) {
-        block.actualEnd = Date()
+        let now = Date()
+
+        block.actualEnd = now
         block.status = .completed
+
         if ScheduleEngine.nextBlock(in: rehearsal) == nil {
-            rehearsal.actualEnd = Date()
+            rehearsal.actualEnd = now
         }
+
         PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
+
         if ScheduleEngine.nextBlock(in: rehearsal) == nil {
-            Task { await LiveActivityManager.shared.end(rehearsal: rehearsal) }
+            Task {
+                await LiveActivityManager.shared.end(rehearsal: rehearsal)
+            }
         } else {
-            Task { await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal) }
+            Task {
+                await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal)
+            }
         }
     }
 }
