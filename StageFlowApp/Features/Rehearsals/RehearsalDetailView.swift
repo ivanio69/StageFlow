@@ -20,12 +20,12 @@ struct RehearsalDetailView: View {
                         Spacer()
 
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text("Прогноз финиша")
+                            Text(rehearsal.isFinished ? "Финиш" : "Прогноз финиша")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
 
                             Text(
-                                ScheduleEngine.predictedFinish(in: rehearsal)
+                                (rehearsal.actualEnd ?? ScheduleEngine.predictedFinish(in: rehearsal))
                                     .formatted(date: .omitted, time: .shortened)
                             )
                             .font(.headline)
@@ -35,11 +35,27 @@ struct RehearsalDetailView: View {
                     Button {
                         showingRunMode = true
                     } label: {
-                        Label("Открыть пульт репетиции", systemImage: "play.fill")
-                            .frame(maxWidth: .infinity)
+                        Label(
+                            rehearsal.isFinished
+                                ? "Открыть завершённую репетицию"
+                                : "Открыть пульт репетиции",
+                            systemImage: rehearsal.isFinished
+                                ? "checkmark.circle"
+                                : "play.fill"
+                        )
+                        .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(rehearsal.sortedBlocks.isEmpty)
+
+                    NavigationLink {
+                        RehearsalSummaryView(rehearsal: rehearsal)
+                    } label: {
+                        Label(
+                            rehearsal.isFinished ? "Итоги репетиции" : "Текущая сводка",
+                            systemImage: "chart.bar.xaxis"
+                        )
+                    }
                 }
                 .padding(.vertical, 6)
             }
@@ -72,6 +88,7 @@ struct RehearsalDetailView: View {
                 ForEach(rehearsal.notes.sorted(by: { $0.createdAt > $1.createdAt })) { note in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(note.text)
+
                         Text(note.createdAt.formatted(date: .omitted, time: .shortened))
                             .font(.caption)
                             .foregroundStyle(.secondary)
