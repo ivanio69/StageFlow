@@ -7,6 +7,7 @@ struct RehearsalRunView: View {
 
     @State private var now = Date()
     @State private var noteText = ""
+    @State private var showingEndConfirmation = false
 
     private var running: RehearsalBlock? {
         ScheduleEngine.currentBlock(in: rehearsal)
@@ -54,15 +55,20 @@ struct RehearsalRunView: View {
                         alignment: .leading,
                         spacing: 8
                     ) {
-                        Text("Прогноз окончания")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Text(
+                            rehearsal.isFinished
+                                ? "Фактическое окончание"
+                                : "Прогноз окончания"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                         Text(
-                            ScheduleEngine.predictedFinish(
-                                in: rehearsal,
-                                now: now
-                            )
+                            (rehearsal.actualEnd
+                                ?? ScheduleEngine.predictedFinish(
+                                    in: rehearsal,
+                                    now: now
+                                ))
                             .formatted(
                                 date: .omitted,
                                 time: .shortened
@@ -136,16 +142,57 @@ struct RehearsalRunView: View {
                         dismiss()
                     }
                 }
+
+                if !rehearsal.isFinished,
+                   rehearsal.actualStart != nil {
+                    ToolbarItem(
+                        placement: .topBarTrailing
+                    ) {
+                        Menu {
+                            Button(
+                                "Завершить репетицию",
+                                systemImage: "stop.circle",
+                                role: .destructive
+                            ) {
+                                showingEndConfirmation = true
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                    }
+                }
             }
         }
         .preferredColorScheme(.dark)
+        .alert(
+            "Завершить репетицию?",
+            isPresented: $showingEndConfirmation
+        ) {
+            Button(
+                "Завершить",
+                role: .destructive
+            ) {
+                endRehearsalNow()
+            }
+
+            Button(
+                "Отмена",
+                role: .cancel
+            ) {}
+        } message: {
+            Text(
+                "Текущий блок будет завершён, а все оставшиеся блоки будут отмечены как пропущенные."
+            )
+        }
         .task {
             syncExternalState()
 
-            await LiveActivityManager.shared.startOrUpdate(
-                rehearsal: rehearsal,
-                now: now
-            )
+            if !rehearsal.isFinished {
+                await LiveActivityManager.shared.startOrUpdate(
+                    rehearsal: rehearsal,
+                    now: now
+                )
+            }
 
             var ticks = 0
 
@@ -160,10 +207,12 @@ struct RehearsalRunView: View {
                 if ticks % 30 == 0 {
                     syncExternalState()
 
-                    await LiveActivityManager.shared.startOrUpdate(
-                        rehearsal: rehearsal,
-                        now: now
-                    )
+                    if !rehearsal.isFinished {
+                        await LiveActivityManager.shared.startOrUpdate(
+                            rehearsal: rehearsal,
+                            now: now
+                        )
+                    }
                 }
             }
         }
@@ -423,6 +472,32 @@ struct RehearsalRunView: View {
 
         syncExternalState()
         refreshLiveActivityAfterTransition()
+    }
+
+    private func endRehearsalNow() {
+        let finishedAt = Date()
+
+        if let running {
+            running.actualEnd = finishedAt
+            running.status = .completed
+        }
+
+        for block in rehearsal.blocks
+            where block.status == .planned {
+            block.status = .skipped
+        }
+
+        rehearsal.actualEnd = finishedAt
+        now = finishedAt
+
+        syncExternalState()
+
+        Task {
+            await LiveActivityManager.shared.end(
+                rehearsal: rehearsal,
+                now: finishedAt
+            )
+        }
     }
 
     private func syncExternalState() {
