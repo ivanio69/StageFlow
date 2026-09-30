@@ -1,6 +1,6 @@
 name: StageFlow
 options:
-  bundleIdPrefix: com.stageflow
+  bundleIdPrefix: com.stageflow999
   deploymentTarget:
     iOS: "18.0"
     watchOS: "11.0"
@@ -19,7 +19,7 @@ targets:
       - path: StageFlowLiveActivityShared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.stageflow.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.stageflow999.app
         INFOPLIST_KEY_CFBundleDisplayName: StageFlow
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
@@ -39,10 +39,10 @@ targets:
       - path: StageFlowShared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.stageflow.app.watchkitapp
+        PRODUCT_BUNDLE_IDENTIFIER: com.stageflow999.app.watchkitapp
         INFOPLIST_KEY_CFBundleDisplayName: StageFlow
         INFOPLIST_KEY_WKApplication: YES
-        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.stageflow.app
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.stageflow999.app
   StageFlowLiveActivity:
     type: app-extension
     platform: iOS
@@ -51,7 +51,7 @@ targets:
       - path: StageFlowLiveActivityShared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.stageflow.app.liveactivity
+        PRODUCT_BUNDLE_IDENTIFIER: com.stageflow999.app.liveactivity
         INFOPLIST_KEY_CFBundleDisplayName: StageFlow
         INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.widgetkit-extension
         SKIP_INSTALL: YES
