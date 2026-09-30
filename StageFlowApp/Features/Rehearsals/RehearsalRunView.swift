@@ -71,9 +71,15 @@ struct RehearsalRunView: View {
         .preferredColorScheme(.dark)
         .task {
             PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
+            await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal, now: now)
+            var ticks = 0
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 now = Date()
+                ticks += 1
+                if ticks % 30 == 0 {
+                    await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal, now: now)
+                }
             }
         }
     }
@@ -150,6 +156,7 @@ struct RehearsalRunView: View {
         block.actualStart = Date()
         block.status = .running
         PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
+        Task { await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal) }
     }
 
     private func finish(_ block: RehearsalBlock) {
@@ -159,5 +166,10 @@ struct RehearsalRunView: View {
             rehearsal.actualEnd = Date()
         }
         PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
+        if ScheduleEngine.nextBlock(in: rehearsal) == nil {
+            Task { await LiveActivityManager.shared.end(rehearsal: rehearsal) }
+        } else {
+            Task { await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal) }
+        }
     }
 }
