@@ -1,5 +1,12 @@
 import Foundation
 
+enum WatchSnapshotMode: String, Codable, Equatable {
+    case idle
+    case ready
+    case running
+    case finished
+}
+
 struct WatchSnapshot: Codable, Equatable {
     let rehearsalID: UUID
     let rehearsalTitle: String
@@ -11,6 +18,7 @@ struct WatchSnapshot: Codable, Equatable {
     let scheduleDeltaSeconds: TimeInterval
     let predictedFinish: Date?
     let nextBlockTitle: String?
+    let mode: WatchSnapshotMode
 
     static let empty = WatchSnapshot(
         rehearsalID: UUID(),
@@ -22,6 +30,7 @@ struct WatchSnapshot: Codable, Equatable {
         actualStart: nil,
         scheduleDeltaSeconds: 0,
         predictedFinish: nil,
-        nextBlockTitle: nil
+        nextBlockTitle: nil,
+        mode: .idle
     )
 }
