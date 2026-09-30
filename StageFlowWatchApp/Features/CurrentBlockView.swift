@@ -21,34 +21,57 @@ struct CurrentBlockView: View {
 
                 HStack(alignment: .firstTextBaseline) {
                     Text(deltaText)
-                        .font(.system(.title2, design: .rounded, weight: .bold))
+                        .font(
+                            .system(
+                                .title2,
+                                design: .rounded,
+                                weight: .bold
+                            )
+                        )
                         .foregroundStyle(deltaColor)
 
                     Spacer()
 
                     if let plannedEnd = snapshot.plannedEnd {
-                        Text(plannedEnd.formatted(date: .omitted, time: .shortened))
-                            .font(.footnote.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                        Text(
+                            plannedEnd.formatted(
+                                date: .omitted,
+                                time: .shortened
+                            )
+                        )
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.secondary)
                     }
                 }
 
                 if snapshot.mode == .running {
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
-                        VStack(alignment: .leading, spacing: 5) {
-                            ProgressView(value: progress(at: context.date))
-                            Text(remainingText(at: context.date))
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                    TimelineView(
+                        .periodic(from: .now, by: 1)
+                    ) { context in
+                        VStack(
+                            alignment: .leading,
+                            spacing: 5
+                        ) {
+                            ProgressView(
+                                value: progress(at: context.date)
+                            )
+
+                            Text(
+                                remainingText(at: context.date)
+                            )
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
                         }
                     }
                 }
 
                 if let next = snapshot.nextBlockTitle {
                     Divider()
+
                     Text("Далее")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+
                     Text(next)
                         .font(.footnote.weight(.semibold))
                         .lineLimit(2)
@@ -56,12 +79,30 @@ struct CurrentBlockView: View {
 
                 primaryAction
 
-                if snapshot.mode == .ready || snapshot.mode == .running {
+                if snapshot.mode == .ready {
+                    Button(role: .destructive) {
+                        session.skipNextBlock()
+                    } label: {
+                        Label(
+                            "Пропустить",
+                            systemImage: "forward.end"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!session.isPhoneReachable)
+                }
+
+                if snapshot.mode == .ready
+                    || snapshot.mode == .running {
                     Button {
                         showingNote = true
                     } label: {
-                        Label("Заметка", systemImage: "mic.fill")
-                            .frame(maxWidth: .infinity)
+                        Label(
+                            "Заметка",
+                            systemImage: "mic.fill"
+                        )
+                        .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                 }
@@ -70,10 +111,16 @@ struct CurrentBlockView: View {
                     Text(status)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .center
+                        )
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
             .padding(.horizontal, 4)
         }
         .sheet(isPresented: $showingNote) {
@@ -91,7 +138,11 @@ struct CurrentBlockView: View {
             Spacer()
 
             Circle()
-                .fill(session.isPhoneReachable ? Color.green : Color.secondary)
+                .fill(
+                    session.isPhoneReachable
+                        ? Color.green
+                        : Color.secondary
+                )
                 .frame(width: 6, height: 6)
         }
     }
@@ -103,8 +154,11 @@ struct CurrentBlockView: View {
             Button {
                 session.finishCurrentBlock()
             } label: {
-                Label("Завершить", systemImage: "checkmark")
-                    .frame(maxWidth: .infinity)
+                Label(
+                    "Завершить",
+                    systemImage: "checkmark"
+                )
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .disabled(!session.isPhoneReachable)
@@ -113,17 +167,23 @@ struct CurrentBlockView: View {
             Button {
                 session.startNextBlock()
             } label: {
-                Label("Начать", systemImage: "play.fill")
-                    .frame(maxWidth: .infinity)
+                Label(
+                    "Начать",
+                    systemImage: "play.fill"
+                )
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .disabled(!session.isPhoneReachable)
 
         case .finished:
-            Label("На сегодня всё", systemImage: "checkmark.seal.fill")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.green)
-                .frame(maxWidth: .infinity)
+            Label(
+                "На сегодня всё",
+                systemImage: "checkmark.seal.fill"
+            )
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.green)
+            .frame(maxWidth: .infinity)
 
         case .idle:
             Text("Нет активного графика")
@@ -136,19 +196,29 @@ struct CurrentBlockView: View {
     private var noteComposer: some View {
         NavigationStack {
             VStack(spacing: 10) {
-                TextField("Заметка", text: $noteText)
-                    .textInputAutocapitalization(.sentences)
+                TextField(
+                    "Заметка",
+                    text: $noteText
+                )
+                .textInputAutocapitalization(.sentences)
 
                 Button {
                     session.addNote(noteText)
                     noteText = ""
                     showingNote = false
                 } label: {
-                    Label("Сохранить", systemImage: "checkmark")
-                        .frame(maxWidth: .infinity)
+                    Label(
+                        "Сохранить",
+                        systemImage: "checkmark"
+                    )
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(
+                    noteText.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty
+                )
 
                 Button("Отмена") {
                     showingNote = false
@@ -160,49 +230,99 @@ struct CurrentBlockView: View {
     }
 
     private var deltaText: String {
-        let minutes = Int((abs(snapshot.scheduleDeltaSeconds) / 60).rounded())
-        guard minutes > 0 else { return "По графику" }
-        return snapshot.scheduleDeltaSeconds > 0 ? "+\(minutes) мин" : "−\(minutes) мин"
+        let minutes = Int(
+            (abs(snapshot.scheduleDeltaSeconds) / 60)
+                .rounded()
+        )
+
+        guard minutes > 0 else {
+            return "По графику"
+        }
+
+        return snapshot.scheduleDeltaSeconds > 0
+            ? "+\(minutes) мин"
+            : "−\(minutes) мин"
     }
 
     private var deltaColor: Color {
-        if snapshot.scheduleDeltaSeconds > 30 { return .orange }
-        if snapshot.scheduleDeltaSeconds < -30 { return .green }
+        if snapshot.scheduleDeltaSeconds > 30 {
+            return .orange
+        }
+
+        if snapshot.scheduleDeltaSeconds < -30 {
+            return .green
+        }
+
         return .secondary
     }
 
-    private func progress(at date: Date) -> Double {
+    private func progress(
+        at date: Date
+    ) -> Double {
         guard let actualStart = snapshot.actualStart,
               let plannedStart = snapshot.plannedStart,
               let plannedEnd = snapshot.plannedEnd else {
             return 0
         }
 
-        let duration = plannedEnd.timeIntervalSince(plannedStart)
+        let duration = plannedEnd.timeIntervalSince(
+            plannedStart
+        )
+
         guard duration > 0 else { return 0 }
 
         let elapsed = date.timeIntervalSince(actualStart)
-        return min(max(elapsed / duration, 0), 1)
+
+        return min(
+            max(elapsed / duration, 0),
+            1
+        )
     }
 
-    private func remainingText(at date: Date) -> String {
+    private func remainingText(
+        at date: Date
+    ) -> String {
         guard let actualStart = snapshot.actualStart,
               let plannedStart = snapshot.plannedStart,
               let plannedEnd = snapshot.plannedEnd else {
             return ""
         }
 
-        let duration = plannedEnd.timeIntervalSince(plannedStart)
-        let expectedEnd = actualStart.addingTimeInterval(duration)
-        let remaining = expectedEnd.timeIntervalSince(date)
+        let duration = plannedEnd.timeIntervalSince(
+            plannedStart
+        )
+
+        let expectedEnd = actualStart.addingTimeInterval(
+            duration
+        )
+
+        let remaining = expectedEnd.timeIntervalSince(
+            date
+        )
 
         if remaining <= 0 {
-            let minutes = max(1, Int((abs(remaining) / 60).rounded()))
+            let minutes = max(
+                1,
+                Int(
+                    (abs(remaining) / 60)
+                        .rounded()
+                )
+            )
+
             return "+\(minutes) мин сверх длительности"
         }
 
         let minutes = Int(remaining / 60)
-        let seconds = Int(remaining.truncatingRemainder(dividingBy: 60))
-        return String(format: "%d:%02d осталось", minutes, seconds)
+        let seconds = Int(
+            remaining.truncatingRemainder(
+                dividingBy: 60
+            )
+        )
+
+        return String(
+            format: "%d:%02d осталось",
+            minutes,
+            seconds
+        )
     }
 }
