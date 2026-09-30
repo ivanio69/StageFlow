@@ -1,10 +1,15 @@
 import SwiftUI
+import SwiftData
 
 struct RehearsalDetailView: View {
+    @Environment(\.modelContext) private var modelContext
+
     let rehearsal: Rehearsal
+
     @State private var showingEditor = false
     @State private var showingRunMode = false
     @State private var noteText = ""
+    @State private var carryNewNote = false
 
     private var delta: TimeInterval {
         ScheduleEngine.scheduleDelta(in: rehearsal)
@@ -72,26 +77,81 @@ struct RehearsalDetailView: View {
             }
 
             Section("Заметки") {
-                HStack {
-                    TextField("Быстрая заметка", text: $noteText, axis: .vertical)
+                VStack(spacing: 8) {
+                    HStack {
+                        TextField("Быстрая заметка", text: $noteText, axis: .vertical)
 
-                    Button("Добавить", systemImage: "plus.circle.fill") {
-                        let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !trimmed.isEmpty else { return }
-
-                        rehearsal.notes.append(RehearsalNote(text: trimmed))
-                        noteText = ""
+                        Button("Добавить", systemImage: "plus.circle.fill") {
+                            addNote()
+                        }
+                        .labelStyle(.iconOnly)
+                        .disabled(
+                            noteText.trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            ).isEmpty
+                        )
                     }
-                    .labelStyle(.iconOnly)
+
+                    Toggle(
+                        "На следующую репетицию",
+                        isOn: $carryNewNote
+                    )
+                    .font(.caption)
                 }
 
-                ForEach(rehearsal.notes.sorted(by: { $0.createdAt > $1.createdAt })) { note in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(note.text)
+                ForEach(
+                    rehearsal.notes.sorted(by: { $0.createdAt > $1.createdAt })
+                ) { note in
+                    HStack(alignment: .top, spacing: 10) {
+                        Button {
+                            note.carryForward.toggle()
+                        } label: {
+                            Image(
+                                systemName: note.carryForward
+                                    ? "pin.fill"
+                                    : "pin"
+                            )
+                            .foregroundStyle(
+                                note.carryForward
+                                    ? .orange
+                                    : .secondary
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            note.carryForward
+                                ? "Не переносить"
+                                : "На следующую репетицию"
+                        )
 
-                        Text(note.createdAt.formatted(date: .omitted, time: .shortened))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(note.text)
+
+                            HStack(spacing: 6) {
+                                Text(
+                                    note.createdAt.formatted(
+                                        date: .omitted,
+                                        time: .shortened
+                                    )
+                                )
+
+                                if note.carryForward {
+                                    Text("· перенести")
+                                }
+                            }
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        }
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            rehearsal.notes.removeAll(where: {
+                                $0.id == note.id
+                            })
+                            modelContext.delete(note)
+                        } label: {
+                            Label("Удалить", systemImage: "trash")
+                        }
                     }
                 }
             }
@@ -118,5 +178,24 @@ struct RehearsalDetailView: View {
                 PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
             }
         }
+    }
+
+    private func addNote() {
+        let trimmed = noteText.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard !trimmed.isEmpty else { return }
+
+        let note = RehearsalNote(
+            text: trimmed,
+            carryForward: carryNewNote
+        )
+
+        modelContext.insert(note)
+        rehearsal.notes.append(note)
+
+        noteText = ""
+        carryNewNote = false
     }
 }
