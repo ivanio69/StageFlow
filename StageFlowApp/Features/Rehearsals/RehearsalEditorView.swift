@@ -30,10 +30,17 @@ struct RehearsalEditorView: View {
                         displayedComponents: [.hourAndMinute]
                     )
 
-                    Button("Добавить в график", systemImage: "plus") {
+                    Button(
+                        "Добавить в график",
+                        systemImage: "plus"
+                    ) {
                         addBlock()
                     }
-                    .disabled(blockTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        blockTitle.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).isEmpty
+                    )
                 }
 
                 Section("Блоки") {
@@ -43,23 +50,37 @@ struct RehearsalEditorView: View {
                     } else {
                         ForEach(rehearsal.sortedBlocks) { block in
                             NavigationLink {
-                                BlockEditorView(block: block)
+                                BlockEditorView(
+                                    rehearsal: rehearsal,
+                                    block: block
+                                )
                             } label: {
                                 BlockRow(block: block)
                             }
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            .swipeActions(
+                                edge: .leading,
+                                allowsFullSwipe: false
+                            ) {
                                 Button {
                                     duplicate(block)
                                 } label: {
-                                    Label("Дублировать", systemImage: "plus.square.on.square")
+                                    Label(
+                                        "Дублировать",
+                                        systemImage: "plus.square.on.square"
+                                    )
                                 }
                                 .tint(.blue)
                             }
                             .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
+                                Button(
+                                    role: .destructive
+                                ) {
                                     delete(block)
                                 } label: {
-                                    Label("Удалить", systemImage: "trash")
+                                    Label(
+                                        "Удалить",
+                                        systemImage: "trash"
+                                    )
                                 }
                             }
                         }
@@ -69,20 +90,31 @@ struct RehearsalEditorView: View {
             }
             .navigationTitle("График")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(
+                    placement: .topBarLeading
+                ) {
                     EditButton()
                 }
 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Готово") { dismiss() }
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button("Готово") {
+                        dismiss()
+                    }
                 }
             }
-            .onAppear(perform: prepareNewBlockTimes)
+            .onAppear(
+                perform: prepareNewBlockTimes
+            )
         }
     }
 
     private func addBlock() {
-        let title = blockTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = blockTitle.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
         guard !title.isEmpty else { return }
 
         let block = RehearsalBlock(
@@ -100,7 +132,9 @@ struct RehearsalEditorView: View {
         blockEnd = blockEnd.addingTimeInterval(30 * 60)
     }
 
-    private func duplicate(_ block: RehearsalBlock) {
+    private func duplicate(
+        _ block: RehearsalBlock
+    ) {
         let copy = RehearsalBlock(
             title: block.title,
             plannedStart: block.plannedStart,
@@ -112,10 +146,20 @@ struct RehearsalEditorView: View {
         rehearsal.blocks.append(copy)
 
         var blocks = rehearsal.sortedBlocks
-        blocks.removeAll(where: { $0.id == copy.id })
+        blocks.removeAll(
+            where: { $0.id == copy.id }
+        )
 
-        if let sourceIndex = blocks.firstIndex(where: { $0.id == block.id }) {
-            blocks.insert(copy, at: min(sourceIndex + 1, blocks.count))
+        if let sourceIndex = blocks.firstIndex(
+            where: { $0.id == block.id }
+        ) {
+            blocks.insert(
+                copy,
+                at: min(
+                    sourceIndex + 1,
+                    blocks.count
+                )
+            )
         } else {
             blocks.append(copy)
         }
@@ -123,15 +167,27 @@ struct RehearsalEditorView: View {
         applyOrder(blocks)
     }
 
-    private func delete(_ block: RehearsalBlock) {
-        rehearsal.blocks.removeAll(where: { $0.id == block.id })
+    private func delete(
+        _ block: RehearsalBlock
+    ) {
+        rehearsal.blocks.removeAll(
+            where: { $0.id == block.id }
+        )
+
         modelContext.delete(block)
         normalizeOrder()
     }
 
-    private func moveBlocks(from source: IndexSet, to destination: Int) {
+    private func moveBlocks(
+        from source: IndexSet,
+        to destination: Int
+    ) {
         var blocks = rehearsal.sortedBlocks
-        blocks.move(fromOffsets: source, toOffset: destination)
+        blocks.move(
+            fromOffsets: source,
+            toOffset: destination
+        )
+
         applyOrder(blocks)
     }
 
@@ -139,7 +195,9 @@ struct RehearsalEditorView: View {
         applyOrder(rehearsal.sortedBlocks)
     }
 
-    private func applyOrder(_ blocks: [RehearsalBlock]) {
+    private func applyOrder(
+        _ blocks: [RehearsalBlock]
+    ) {
         for (index, block) in blocks.enumerated() {
             block.orderIndex = index
         }
@@ -148,12 +206,14 @@ struct RehearsalEditorView: View {
     private func prepareNewBlockTimes() {
         if let last = rehearsal.sortedBlocks.last {
             blockStart = last.plannedEnd
-            blockEnd = last.plannedEnd.addingTimeInterval(30 * 60)
+            blockEnd = last.plannedEnd
+                .addingTimeInterval(30 * 60)
         } else {
             blockStart = rehearsal.scheduledStart
             blockEnd = min(
                 rehearsal.scheduledEnd,
-                rehearsal.scheduledStart.addingTimeInterval(30 * 60)
+                rehearsal.scheduledStart
+                    .addingTimeInterval(30 * 60)
             )
         }
     }
