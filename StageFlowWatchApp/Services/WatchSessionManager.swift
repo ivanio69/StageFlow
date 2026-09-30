@@ -112,16 +112,20 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
             handle(session.applicationContext)
         }
 
+        let reachable = session.isReachable
+
         Task { @MainActor in
-            isPhoneReachable = session.isReachable
+            isPhoneReachable = reachable
         }
     }
 
     nonisolated func sessionReachabilityDidChange(
         _ session: WCSession
     ) {
+        let reachable = session.isReachable
+
         Task { @MainActor in
-            isPhoneReachable = session.isReachable
+            isPhoneReachable = reachable
         }
     }
 
