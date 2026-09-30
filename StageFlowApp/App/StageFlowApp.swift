@@ -19,7 +19,7 @@ struct StageFlowApp: App {
             ProjectsView()
                 .preferredColorScheme(.dark)
                 .task {
-                    PhoneWatchSessionManager.shared.activate()
+                    PhoneWatchSessionManager.shared.configure(modelContainer: modelContainer)
                 }
         }
         .modelContainer(modelContainer)
