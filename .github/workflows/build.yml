@@ -6,10 +6,6 @@ on:
       - main
   workflow_dispatch:
 
-concurrency:
-  group: stageflow-main-build
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: macos-15
