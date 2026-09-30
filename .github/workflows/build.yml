@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: stageflow-main-build
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-15
@@ -29,11 +33,21 @@ jobs:
         run: xcodebuild -project StageFlow.xcodeproj -list
 
       - name: Build iOS app
-        run: |
-          set -o pipefail
-          xcodebuild             -project StageFlow.xcodeproj             -scheme StageFlow             -configuration Debug             -destination 'generic/platform=iOS Simulator'             CODE_SIGNING_ALLOWED=NO             build
+        run: >
+          xcodebuild
+          -project StageFlow.xcodeproj
+          -scheme StageFlow
+          -configuration Debug
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build
 
       - name: Build watchOS app
-        run: |
-          set -o pipefail
-          xcodebuild             -project StageFlow.xcodeproj             -scheme StageFlowWatch             -configuration Debug             -destination 'generic/platform=watchOS Simulator'             CODE_SIGNING_ALLOWED=NO             build
+        run: >
+          xcodebuild
+          -project StageFlow.xcodeproj
+          -scheme StageFlowWatch
+          -configuration Debug
+          -destination 'generic/platform=watchOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build
