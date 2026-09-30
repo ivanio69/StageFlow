@@ -16,6 +16,7 @@ targets:
     sources:
       - path: StageFlowApp
       - path: StageFlowShared
+      - path: StageFlowLiveActivityShared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.stageflow.app
@@ -23,9 +24,12 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_NSSupportsLiveActivities: YES
         TARGETED_DEVICE_FAMILY: "1,2"
     dependencies:
       - target: StageFlowWatch
+        embed: true
+      - target: StageFlowLiveActivity
         embed: true
   StageFlowWatch:
     type: application
@@ -39,3 +43,15 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: StageFlow
         INFOPLIST_KEY_WKApplication: YES
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.stageflow.app
+  StageFlowLiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: StageFlowLiveActivity
+      - path: StageFlowLiveActivityShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stageflow.app.liveactivity
+        INFOPLIST_KEY_CFBundleDisplayName: StageFlow
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        SKIP_INSTALL: YES
