@@ -44,6 +44,7 @@ final class PhoneWatchSessionManager: NSObject, WCSessionDelegate {
         let next = ScheduleEngine.nextBlock(in: rehearsal)
 
         let mode: WatchSnapshotMode
+
         if current != nil {
             mode = .running
         } else if next != nil {
@@ -58,7 +59,9 @@ final class PhoneWatchSessionManager: NSObject, WCSessionDelegate {
             rehearsalID: rehearsal.id,
             rehearsalTitle: rehearsal.title,
             blockID: current?.id,
-            blockTitle: current?.title ?? next?.title ?? (rehearsal.blocks.isEmpty ? "График пуст" : "На сегодня всё"),
+            blockTitle: current?.title
+                ?? next?.title
+                ?? (rehearsal.blocks.isEmpty ? "График пуст" : "На сегодня всё"),
             plannedStart: current?.plannedStart ?? next?.plannedStart,
             plannedEnd: current?.plannedEnd ?? next?.plannedEnd,
             actualStart: current?.actualStart,
@@ -66,13 +69,17 @@ final class PhoneWatchSessionManager: NSObject, WCSessionDelegate {
             predictedFinish: ScheduleEngine.predictedFinish(in: rehearsal),
             nextBlockTitle: current.flatMap { running in
                 rehearsal.sortedBlocks.first(where: {
-                    $0.orderIndex > running.orderIndex && $0.status == .planned
+                    $0.orderIndex > running.orderIndex
+                        && $0.status == .planned
                 })?.title
             },
             mode: mode
         )
 
-        guard let data = try? JSONEncoder().encode(snapshot) else { return [:] }
+        guard let data = try? JSONEncoder().encode(snapshot) else {
+            return [:]
+        }
+
         return ["snapshot": data]
     }
 
@@ -80,8 +87,13 @@ final class PhoneWatchSessionManager: NSObject, WCSessionDelegate {
         guard let modelContainer else { return }
 
         let context = modelContainer.mainContext
-        guard let rehearsals = try? context.fetch(FetchDescriptor<Rehearsal>()),
-              let rehearsal = rehearsals.first(where: { $0.id == command.rehearsalID }) else {
+
+        guard let rehearsals = try? context.fetch(
+            FetchDescriptor<Rehearsal>()
+        ),
+        let rehearsal = rehearsals.first(where: {
+            $0.id == command.rehearsalID
+        }) else {
             return
         }
 
@@ -93,9 +105,11 @@ final class PhoneWatchSessionManager: NSObject, WCSessionDelegate {
             }
 
             let now = Date()
+
             if rehearsal.actualStart == nil {
                 rehearsal.actualStart = now
             }
+
             next.actualStart = now
             next.status = .running
 
@@ -112,32 +126,54 @@ final class PhoneWatchSessionManager: NSObject, WCSessionDelegate {
                 rehearsal.actualEnd = now
             }
 
+        case .skipNextBlock:
+            guard ScheduleEngine.currentBlock(in: rehearsal) == nil,
+                  let next = ScheduleEngine.nextBlock(in: rehearsal) else {
+                return
+            }
+
+            next.status = .skipped
+
+            if ScheduleEngine.nextBlock(in: rehearsal) == nil {
+                rehearsal.actualEnd = Date()
+            }
+
         case .addNote:
             let text = command.text?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
             guard !text.isEmpty else { return }
 
-            rehearsal.notes.append(
-                RehearsalNote(
-                    text: text,
-                    blockID: ScheduleEngine.currentBlock(in: rehearsal)?.id
-                )
+            let note = RehearsalNote(
+                text: text,
+                blockID: ScheduleEngine.currentBlock(in: rehearsal)?.id
             )
+
+            context.insert(note)
+            rehearsal.notes.append(note)
         }
 
         try? context.save()
         sync(rehearsal: rehearsal)
 
         switch command.action {
-        case .startNextBlock:
-            await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal)
+        case .startNextBlock, .skipNextBlock:
+            if ScheduleEngine.nextBlock(in: rehearsal) == nil,
+               ScheduleEngine.currentBlock(in: rehearsal) == nil {
+                await LiveActivityManager.shared.end(rehearsal: rehearsal)
+            } else {
+                await LiveActivityManager.shared.startOrUpdate(
+                    rehearsal: rehearsal
+                )
+            }
 
         case .finishCurrentBlock:
             if ScheduleEngine.nextBlock(in: rehearsal) == nil {
                 await LiveActivityManager.shared.end(rehearsal: rehearsal)
             } else {
-                await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal)
+                await LiveActivityManager.shared.startOrUpdate(
+                    rehearsal: rehearsal
+                )
             }
 
         case .addNote:
@@ -145,9 +181,17 @@ final class PhoneWatchSessionManager: NSObject, WCSessionDelegate {
         }
     }
 
-    nonisolated private func decodeCommand(from payload: [String: Any]) -> WatchCommand? {
-        guard let data = payload["command"] as? Data else { return nil }
-        return try? JSONDecoder().decode(WatchCommand.self, from: data)
+    nonisolated private func decodeCommand(
+        from payload: [String: Any]
+    ) -> WatchCommand? {
+        guard let data = payload["command"] as? Data else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(
+            WatchCommand.self,
+            from: data
+        )
     }
 
     nonisolated func session(
@@ -156,23 +200,39 @@ final class PhoneWatchSessionManager: NSObject, WCSessionDelegate {
         error: Error?
     ) {}
 
-    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        guard let command = decodeCommand(from: message) else { return }
+    nonisolated func session(
+        _ session: WCSession,
+        didReceiveMessage message: [String: Any]
+    ) {
+        guard let command = decodeCommand(from: message) else {
+            return
+        }
+
         Task { @MainActor in
             await process(command)
         }
     }
 
-    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
-        guard let command = decodeCommand(from: userInfo) else { return }
+    nonisolated func session(
+        _ session: WCSession,
+        didReceiveUserInfo userInfo: [String: Any] = [:]
+    ) {
+        guard let command = decodeCommand(from: userInfo) else {
+            return
+        }
+
         Task { @MainActor in
             await process(command)
         }
     }
 
-    nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
+    nonisolated func sessionDidBecomeInactive(
+        _ session: WCSession
+    ) {}
 
-    nonisolated func sessionDidDeactivate(_ session: WCSession) {
+    nonisolated func sessionDidDeactivate(
+        _ session: WCSession
+    ) {
         WCSession.default.activate()
     }
 }
