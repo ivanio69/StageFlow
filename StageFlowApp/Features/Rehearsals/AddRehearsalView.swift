@@ -12,12 +12,20 @@ struct AddRehearsalView: View {
     @State private var end = Date().addingTimeInterval(2 * 3600)
     @State private var carryPreviousNotes = true
 
-    private var carriedNotes: [RehearsalNote] {
+    private var previousRehearsal: Rehearsal? {
         production.rehearsals
-            .sorted(by: { $0.scheduledStart > $1.scheduledStart })
-            .first?
+            .filter { $0.scheduledStart < start }
+            .max(by: { $0.scheduledStart < $1.scheduledStart })
+    }
+
+    private var carriedNotes: [RehearsalNote] {
+        previousRehearsal?
             .notes
             .filter { $0.carryForward } ?? []
+    }
+
+    private var trimmedTitle: String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var body: some View {
@@ -55,14 +63,17 @@ struct AddRehearsalView: View {
                     Button("Создать") {
                         createRehearsal()
                     }
+                    .disabled(trimmedTitle.isEmpty)
                 }
             }
         }
     }
 
     private func createRehearsal() {
+        guard !trimmedTitle.isEmpty else { return }
+
         let rehearsal = Rehearsal(
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: trimmedTitle,
             scheduledStart: start,
             scheduledEnd: end
         )
