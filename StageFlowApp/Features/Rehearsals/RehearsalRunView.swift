@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RehearsalRunView: View {
     @Environment(\.dismiss) private var dismiss
+
     let rehearsal: Rehearsal
 
     @State private var now = Date()
@@ -16,15 +17,24 @@ struct RehearsalRunView: View {
     }
 
     private var delta: TimeInterval {
-        ScheduleEngine.scheduleDelta(in: rehearsal, now: now)
+        ScheduleEngine.scheduleDelta(
+            in: rehearsal,
+            now: now
+        )
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 24
+                ) {
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 4
+                        ) {
                             Text("РЕПЕТИЦИЯ")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(.secondary)
@@ -34,27 +44,47 @@ struct RehearsalRunView: View {
                         }
 
                         Spacer()
+
                         TimeDeltaBadge(seconds: delta)
                     }
 
                     currentCard
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
                         Text("Прогноз окончания")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
                         Text(
-                            ScheduleEngine.predictedFinish(in: rehearsal, now: now)
-                                .formatted(date: .omitted, time: .shortened)
+                            ScheduleEngine.predictedFinish(
+                                in: rehearsal,
+                                now: now
+                            )
+                            .formatted(
+                                date: .omitted,
+                                time: .shortened
+                            )
                         )
-                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                        .font(
+                            .system(
+                                size: 42,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
                     }
 
                     quickNote
 
-                    if let next, running != nil {
-                        VStack(alignment: .leading, spacing: 6) {
+                    if let next,
+                       running != nil {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 6
+                        ) {
                             Text("Далее")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -69,21 +99,40 @@ struct RehearsalRunView: View {
                             )
 
                             HStack(spacing: 6) {
-                                Text("План \(next.plannedStart.formatted(date: .omitted, time: .shortened))")
+                                Text(
+                                    "План \(next.plannedStart.formatted(date: .omitted, time: .shortened))"
+                                )
                                 Text("→")
-                                Text("~\(projected.formatted(date: .omitted, time: .shortened))")
+                                Text(
+                                    "~\(projected.formatted(date: .omitted, time: .shortened))"
+                                )
                             }
                             .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(delta > 30 ? .orange : (delta < -30 ? .green : .secondary))
+                            .foregroundStyle(
+                                delta > 30
+                                    ? .orange
+                                    : (
+                                        delta < -30
+                                            ? .green
+                                            : .secondary
+                                    )
+                            )
                         }
                     }
                 }
                 .padding(20)
             }
-            .background(Color.black.ignoresSafeArea())
+            .background(
+                Color.black.ignoresSafeArea()
+            )
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Закрыть", systemImage: "xmark") {
+                ToolbarItem(
+                    placement: .topBarLeading
+                ) {
+                    Button(
+                        "Закрыть",
+                        systemImage: "xmark"
+                    ) {
                         dismiss()
                     }
                 }
@@ -91,19 +140,30 @@ struct RehearsalRunView: View {
         }
         .preferredColorScheme(.dark)
         .task {
-            PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
-            await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal, now: now)
+            syncExternalState()
+
+            await LiveActivityManager.shared.startOrUpdate(
+                rehearsal: rehearsal,
+                now: now
+            )
 
             var ticks = 0
 
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
+                try? await Task.sleep(
+                    for: .seconds(1)
+                )
+
                 now = Date()
                 ticks += 1
 
                 if ticks % 30 == 0 {
-                    PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
-                    await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal, now: now)
+                    syncExternalState()
+
+                    await LiveActivityManager.shared.startOrUpdate(
+                        rehearsal: rehearsal,
+                        now: now
+                    )
                 }
             }
         }
@@ -112,9 +172,18 @@ struct RehearsalRunView: View {
     @ViewBuilder
     private var currentCard: some View {
         if let running {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(
+                alignment: .leading,
+                spacing: 18
+            ) {
                 Text(running.title)
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .font(
+                        .system(
+                            size: 34,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
 
                 HStack(spacing: 8) {
                     Text("План")
@@ -137,12 +206,22 @@ struct RehearsalRunView: View {
                     HStack(spacing: 8) {
                         Text("Факт")
                             .foregroundStyle(.secondary)
-                        Text(actualStart.formatted(date: .omitted, time: .shortened))
-                            .monospacedDigit()
+
+                        Text(
+                            actualStart.formatted(
+                                date: .omitted,
+                                time: .shortened
+                            )
+                        )
+                        .monospacedDigit()
+
                         Text("→")
                             .foregroundStyle(.secondary)
-                        Text("~\(projectedEnd.formatted(date: .omitted, time: .shortened))")
-                            .monospacedDigit()
+
+                        Text(
+                            "~\(projectedEnd.formatted(date: .omitted, time: .shortened))"
+                        )
+                        .monospacedDigit()
                     }
                     .font(.subheadline)
                 }
@@ -150,19 +229,36 @@ struct RehearsalRunView: View {
                 Button {
                     finish(running)
                 } label: {
-                    Label("Завершить блок", systemImage: "checkmark")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                    Label(
+                        "Завершить блок",
+                        systemImage: "checkmark"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
                 }
                 .buttonStyle(.borderedProminent)
             }
             .padding(20)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+            .background(
+                .regularMaterial,
+                in: RoundedRectangle(
+                    cornerRadius: 24
+                )
+            )
         } else if let next {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(
+                alignment: .leading,
+                spacing: 18
+            ) {
                 Text(next.title)
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .font(
+                        .system(
+                            size: 34,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
 
                 let projectedStart = ScheduleEngine.projectedStart(
                     for: next,
@@ -174,46 +270,91 @@ struct RehearsalRunView: View {
                     Text(
                         "План \(next.plannedStart.formatted(date: .omitted, time: .shortened)) · прогноз ~\(projectedStart.formatted(date: .omitted, time: .shortened))"
                     )
-                    .foregroundStyle(delta > 0 ? .orange : .green)
+                    .foregroundStyle(
+                        delta > 0
+                            ? .orange
+                            : .green
+                    )
                 } else {
-                    Text("Старт по плану в \(next.plannedStart.formatted(date: .omitted, time: .shortened))")
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "Старт по плану в \(next.plannedStart.formatted(date: .omitted, time: .shortened))"
+                    )
+                    .foregroundStyle(.secondary)
                 }
 
                 Button {
                     start(next)
                 } label: {
-                    Label("Начать блок", systemImage: "play.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                    Label(
+                        "Начать блок",
+                        systemImage: "play.fill"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
                 }
                 .buttonStyle(.borderedProminent)
+
+                Button(
+                    role: .destructive
+                ) {
+                    skip(next)
+                } label: {
+                    Label(
+                        "Пропустить блок",
+                        systemImage: "forward.end"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
             }
             .padding(20)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+            .background(
+                .regularMaterial,
+                in: RoundedRectangle(
+                    cornerRadius: 24
+                )
+            )
         } else {
             ContentUnavailableView(
                 "На сегодня всё",
                 systemImage: "checkmark.seal.fill",
-                description: Text("Репетиция завершена.")
+                description: Text(
+                    "Репетиция завершена."
+                )
             )
         }
     }
 
     private var quickNote: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
             Text("Быстрая заметка")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack(alignment: .bottom) {
-                TextField("Что нужно исправить?", text: $noteText, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
+                TextField(
+                    "Что нужно исправить?",
+                    text: $noteText,
+                    axis: .vertical
+                )
+                .textFieldStyle(.roundedBorder)
 
-                Button("Добавить", systemImage: "plus") {
-                    let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
+                Button(
+                    "Добавить",
+                    systemImage: "plus"
+                ) {
+                    let trimmed = noteText
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+
+                    guard !trimmed.isEmpty else {
+                        return
+                    }
 
                     rehearsal.notes.append(
                         RehearsalNote(
@@ -221,6 +362,7 @@ struct RehearsalRunView: View {
                             blockID: running?.id
                         )
                     )
+
                     noteText = ""
                 }
                 .labelStyle(.iconOnly)
@@ -229,7 +371,9 @@ struct RehearsalRunView: View {
         }
     }
 
-    private func start(_ block: RehearsalBlock) {
+    private func start(
+        _ block: RehearsalBlock
+    ) {
         let now = Date()
 
         if rehearsal.actualStart == nil {
@@ -239,31 +383,71 @@ struct RehearsalRunView: View {
         block.actualStart = now
         block.status = .running
 
-        PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
+        syncExternalState()
+
         Task {
-            await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal)
+            await LiveActivityManager.shared.startOrUpdate(
+                rehearsal: rehearsal
+            )
         }
     }
 
-    private func finish(_ block: RehearsalBlock) {
+    private func finish(
+        _ block: RehearsalBlock
+    ) {
         let now = Date()
 
         block.actualEnd = now
         block.status = .completed
 
-        if ScheduleEngine.nextBlock(in: rehearsal) == nil {
+        if ScheduleEngine.nextBlock(
+            in: rehearsal
+        ) == nil {
             rehearsal.actualEnd = now
         }
 
-        PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
+        syncExternalState()
+        refreshLiveActivityAfterTransition()
+    }
 
-        if ScheduleEngine.nextBlock(in: rehearsal) == nil {
+    private func skip(
+        _ block: RehearsalBlock
+    ) {
+        block.status = .skipped
+
+        if ScheduleEngine.nextBlock(
+            in: rehearsal
+        ) == nil {
+            rehearsal.actualEnd = Date()
+        }
+
+        syncExternalState()
+        refreshLiveActivityAfterTransition()
+    }
+
+    private func syncExternalState() {
+        PhoneWatchSessionManager.shared.sync(
+            rehearsal: rehearsal
+        )
+    }
+
+    private func refreshLiveActivityAfterTransition() {
+        if ScheduleEngine.nextBlock(
+            in: rehearsal
+        ) == nil,
+        ScheduleEngine.currentBlock(
+            in: rehearsal
+        ) == nil {
             Task {
-                await LiveActivityManager.shared.end(rehearsal: rehearsal)
+                await LiveActivityManager.shared.end(
+                    rehearsal: rehearsal
+                )
             }
         } else {
             Task {
-                await LiveActivityManager.shared.startOrUpdate(rehearsal: rehearsal)
+                await LiveActivityManager.shared.startOrUpdate(
+                    rehearsal: rehearsal
+                )
             }
         }
     }
