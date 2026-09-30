@@ -11,6 +11,7 @@ struct AddRehearsalView: View {
     @State private var start = Date()
     @State private var end = Date().addingTimeInterval(2 * 3600)
     @State private var carryPreviousNotes = true
+    @State private var copyPreviousSchedule = false
 
     private var previousRehearsal: Rehearsal? {
         production.rehearsals
@@ -24,6 +25,10 @@ struct AddRehearsalView: View {
             .filter { $0.carryForward } ?? []
     }
 
+    private var canCopyPreviousSchedule: Bool {
+        !(previousRehearsal?.blocks.isEmpty ?? true)
+    }
+
     private var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -35,6 +40,34 @@ struct AddRehearsalView: View {
                     TextField("Название", text: $title)
                     DatePicker("Начало", selection: $start)
                     DatePicker("Окончание", selection: $end, in: start...)
+                }
+
+                if let previousRehearsal,
+                   canCopyPreviousSchedule {
+                    Section("График") {
+                        Toggle(
+                            "Взять график прошлой репетиции",
+                            isOn: $copyPreviousSchedule
+                        )
+
+                        if copyPreviousSchedule {
+                            LabeledContent(
+                                "Основа",
+                                value: previousRehearsal.title
+                            )
+
+                            LabeledContent(
+                                "Блоков",
+                                value: "\(previousRehearsal.blocks.count)"
+                            )
+
+                            Text(
+                                "Время блоков будет перенесено относительно нового начала. Фактические отметки и статусы не копируются."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 if !carriedNotes.isEmpty {
@@ -66,6 +99,16 @@ struct AddRehearsalView: View {
                     .disabled(trimmedTitle.isEmpty)
                 }
             }
+            .onChange(of: start) { _, _ in
+                if copyPreviousSchedule {
+                    applyTemplateDuration()
+                }
+            }
+            .onChange(of: copyPreviousSchedule) { _, isEnabled in
+                if isEnabled {
+                    applyTemplateDuration()
+                }
+            }
         }
     }
 
@@ -81,6 +124,14 @@ struct AddRehearsalView: View {
         modelContext.insert(rehearsal)
         production.rehearsals.append(rehearsal)
 
+        if copyPreviousSchedule,
+           let previousRehearsal {
+            copySchedule(
+                from: previousRehearsal,
+                to: rehearsal
+            )
+        }
+
         if carryPreviousNotes {
             for source in carriedNotes {
                 let note = RehearsalNote(
@@ -88,11 +139,49 @@ struct AddRehearsalView: View {
                     blockID: nil,
                     carryForward: true
                 )
+
                 modelContext.insert(note)
                 rehearsal.notes.append(note)
             }
         }
 
         dismiss()
+    }
+
+    private func copySchedule(
+        from source: Rehearsal,
+        to destination: Rehearsal
+    ) {
+        for sourceBlock in source.sortedBlocks {
+            let startOffset = sourceBlock.plannedStart
+                .timeIntervalSince(source.scheduledStart)
+
+            let endOffset = sourceBlock.plannedEnd
+                .timeIntervalSince(source.scheduledStart)
+
+            let block = RehearsalBlock(
+                title: sourceBlock.title,
+                plannedStart: destination.scheduledStart
+                    .addingTimeInterval(startOffset),
+                plannedEnd: destination.scheduledStart
+                    .addingTimeInterval(endOffset),
+                orderIndex: sourceBlock.orderIndex
+            )
+
+            modelContext.insert(block)
+            destination.blocks.append(block)
+        }
+    }
+
+    private func applyTemplateDuration() {
+        guard let previousRehearsal else { return }
+
+        let duration = max(
+            0,
+            previousRehearsal.scheduledEnd
+                .timeIntervalSince(previousRehearsal.scheduledStart)
+        )
+
+        end = start.addingTimeInterval(duration)
     }
 }
