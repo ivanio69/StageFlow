@@ -47,8 +47,11 @@ struct ProductionDetailView: View {
                                     Text("Итог")
                                     Text(
                                         ScheduleEngine.formattedDelta(
-                                            (rehearsal.actualEnd ?? rehearsal.scheduledEnd)
-                                                .timeIntervalSince(rehearsal.scheduledEnd)
+                                            (rehearsal.actualEnd
+                                                ?? rehearsal.scheduledEnd)
+                                                .timeIntervalSince(
+                                                    rehearsal.scheduledEnd
+                                                )
                                         )
                                     )
                                     .fontWeight(.semibold)
@@ -57,12 +60,16 @@ struct ProductionDetailView: View {
                                 .foregroundStyle(
                                     resultColor(for: rehearsal)
                                 )
-                            } else if ScheduleEngine.currentBlock(in: rehearsal) != nil {
+                            } else if ScheduleEngine.currentBlock(
+                                in: rehearsal
+                            ) != nil {
                                 HStack(spacing: 6) {
                                     Text("Сейчас")
                                     Text(
                                         ScheduleEngine.formattedDelta(
-                                            ScheduleEngine.scheduleDelta(in: rehearsal)
+                                            ScheduleEngine.scheduleDelta(
+                                                in: rehearsal
+                                            )
                                         )
                                     )
                                     .fontWeight(.semibold)
@@ -81,7 +88,10 @@ struct ProductionDetailView: View {
         .navigationTitle(production.title)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Репетиция", systemImage: "plus") {
+                Button(
+                    "Репетиция",
+                    systemImage: "plus"
+                ) {
                     isAddingRehearsal = true
                 }
             }
@@ -91,45 +101,73 @@ struct ProductionDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private func statusBadge(for rehearsal: Rehearsal) -> some View {
-        let title: String
-        let systemImage: String
-        let color: Color
+    private func statusBadge(
+        for rehearsal: Rehearsal
+    ) -> some View {
+        let status = statusInfo(for: rehearsal)
 
-        if rehearsal.isFinished {
-            title = "Завершена"
-            systemImage = "checkmark.circle.fill"
-            color = .green
-        } else if ScheduleEngine.currentBlock(in: rehearsal) != nil {
-            title = "Идёт"
-            systemImage = "play.circle.fill"
-            color = .orange
-        } else {
-            title = "Запланирована"
-            systemImage = "clock"
-            color = .secondary
-        }
-
-        Label(title, systemImage: systemImage)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(color)
+        return Label(
+            status.title,
+            systemImage: status.systemImage
+        )
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(status.color)
     }
 
-    private func resultColor(for rehearsal: Rehearsal) -> Color {
+    private func statusInfo(
+        for rehearsal: Rehearsal
+    ) -> (
+        title: String,
+        systemImage: String,
+        color: Color
+    ) {
+        if rehearsal.isFinished {
+            return (
+                "Завершена",
+                "checkmark.circle.fill",
+                .green
+            )
+        }
+
+        if ScheduleEngine.currentBlock(
+            in: rehearsal
+        ) != nil {
+            return (
+                "Идёт",
+                "play.circle.fill",
+                .orange
+            )
+        }
+
+        return (
+            "Запланирована",
+            "clock",
+            .secondary
+        )
+    }
+
+    private func resultColor(
+        for rehearsal: Rehearsal
+    ) -> Color {
         guard let actualEnd = rehearsal.actualEnd else {
             return .secondary
         }
 
-        let delta = actualEnd.timeIntervalSince(rehearsal.scheduledEnd)
+        let delta = actualEnd.timeIntervalSince(
+            rehearsal.scheduledEnd
+        )
 
         if delta > 30 { return .orange }
         if delta < -30 { return .green }
         return .secondary
     }
 
-    private func liveColor(for rehearsal: Rehearsal) -> Color {
-        let delta = ScheduleEngine.scheduleDelta(in: rehearsal)
+    private func liveColor(
+        for rehearsal: Rehearsal
+    ) -> Color {
+        let delta = ScheduleEngine.scheduleDelta(
+            in: rehearsal
+        )
 
         if delta > 30 { return .orange }
         if delta < -30 { return .green }
