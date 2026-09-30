@@ -1,6 +1,13 @@
 import SwiftUI
 
 struct RehearsalSummaryView: View {
+    struct BlockTimingResult: Identifiable {
+        let block: RehearsalBlock
+        let delta: TimeInterval
+
+        var id: UUID { block.id }
+    }
+
     let rehearsal: Rehearsal
 
     private var plannedDuration: TimeInterval {
@@ -17,6 +24,7 @@ struct RehearsalSummaryView: View {
         if let actualEnd = rehearsal.actualEnd {
             return actualEnd.timeIntervalSince(rehearsal.scheduledEnd)
         }
+
         return ScheduleEngine.scheduleDelta(in: rehearsal)
     }
 
@@ -26,7 +34,7 @@ struct RehearsalSummaryView: View {
         }
     }
 
-    private var blockResults: [(block: RehearsalBlock, delta: TimeInterval)] {
+    private var blockResults: [BlockTimingResult] {
         completedBlocks.compactMap { block in
             guard let actualStart = block.actualStart,
                   let actualEnd = block.actualEnd else {
@@ -34,7 +42,10 @@ struct RehearsalSummaryView: View {
             }
 
             let actual = actualEnd.timeIntervalSince(actualStart)
-            return (block, actual - block.plannedDuration)
+            return BlockTimingResult(
+                block: block,
+                delta: actual - block.plannedDuration
+            )
         }
         .sorted { abs($0.delta) > abs($1.delta) }
     }
@@ -75,17 +86,15 @@ struct RehearsalSummaryView: View {
 
             if !blockResults.isEmpty {
                 Section("Блоки по времени") {
-                    ForEach(Array(blockResults.prefix(5)), id: \.block.id) { item in
+                    ForEach(Array(blockResults.prefix(5))) { item in
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(item.block.title)
                                     .font(.headline)
 
-                                Text(
-                                    "План \(durationText(item.block.plannedDuration))"
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                Text("План \(durationText(item.block.plannedDuration))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
 
                             Spacer()
@@ -102,7 +111,8 @@ struct RehearsalSummaryView: View {
             Section("Заметки") {
                 LabeledContent("Всего", value: "\(rehearsal.notes.count)")
 
-                let carried = rehearsal.notes.filter(\.carryForward).count
+                let carried = rehearsal.notes.filter { $0.carryForward }.count
+
                 if carried > 0 {
                     LabeledContent("На следующую репетицию", value: "\(carried)")
                 }
