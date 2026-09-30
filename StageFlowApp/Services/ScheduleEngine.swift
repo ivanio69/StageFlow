@@ -34,6 +34,46 @@ struct ScheduleEngine {
         rehearsal.scheduledEnd.addingTimeInterval(scheduleDelta(in: rehearsal, now: now))
     }
 
+    static func projectedStart(
+        for block: RehearsalBlock,
+        in rehearsal: Rehearsal,
+        now: Date = Date()
+    ) -> Date {
+        if let actualStart = block.actualStart {
+            return actualStart
+        }
+
+        guard block.status == .planned else {
+            return block.plannedStart
+        }
+
+        return block.plannedStart.addingTimeInterval(
+            scheduleDelta(in: rehearsal, now: now)
+        )
+    }
+
+    static func projectedEnd(
+        for block: RehearsalBlock,
+        in rehearsal: Rehearsal,
+        now: Date = Date()
+    ) -> Date {
+        if let actualEnd = block.actualEnd {
+            return actualEnd
+        }
+
+        if let actualStart = block.actualStart, block.status == .running {
+            return actualStart.addingTimeInterval(block.plannedDuration)
+        }
+
+        guard block.status == .planned else {
+            return block.plannedEnd
+        }
+
+        return block.plannedEnd.addingTimeInterval(
+            scheduleDelta(in: rehearsal, now: now)
+        )
+    }
+
     static func formattedDelta(_ seconds: TimeInterval) -> String {
         let roundedMinutes = Int((abs(seconds) / 60).rounded())
         if roundedMinutes == 0 { return "по графику" }
