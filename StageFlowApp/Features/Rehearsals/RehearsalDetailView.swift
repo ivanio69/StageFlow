@@ -16,13 +16,19 @@ struct RehearsalDetailView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
                         TimeDeltaBadge(seconds: delta)
+
                         Spacer()
+
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("Прогноз финиша")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text(ScheduleEngine.predictedFinish(in: rehearsal).formatted(date: .omitted, time: .shortened))
-                                .font(.headline)
+
+                            Text(
+                                ScheduleEngine.predictedFinish(in: rehearsal)
+                                    .formatted(date: .omitted, time: .shortened)
+                            )
+                            .font(.headline)
                         }
                     }
 
@@ -33,6 +39,7 @@ struct RehearsalDetailView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(rehearsal.sortedBlocks.isEmpty)
                 }
                 .padding(.vertical, 6)
             }
@@ -43,7 +50,7 @@ struct RehearsalDetailView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(rehearsal.sortedBlocks) { block in
-                        BlockRow(block: block)
+                        BlockRow(block: block, rehearsal: rehearsal)
                     }
                 }
             }
@@ -51,9 +58,11 @@ struct RehearsalDetailView: View {
             Section("Заметки") {
                 HStack {
                     TextField("Быстрая заметка", text: $noteText, axis: .vertical)
+
                     Button("Добавить", systemImage: "plus.circle.fill") {
                         let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else { return }
+
                         rehearsal.notes.append(RehearsalNote(text: trimmed))
                         noteText = ""
                     }
@@ -86,6 +95,11 @@ struct RehearsalDetailView: View {
         }
         .onAppear {
             PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
+        }
+        .onChange(of: showingEditor) { _, isShowing in
+            if !isShowing {
+                PhoneWatchSessionManager.shared.sync(rehearsal: rehearsal)
+            }
         }
     }
 }
