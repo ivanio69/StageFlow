@@ -2,24 +2,18 @@ import SwiftUI
 import SwiftData
 
 @main
+@MainActor
 struct StageFlowApp: App {
-    private let modelContainer: ModelContainer = {
-        let schema = Schema([
-            Production.self,
-            Rehearsal.self,
-            RehearsalBlock.self,
-            RehearsalNote.self
-        ])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        return try! ModelContainer(for: schema, configurations: [configuration])
-    }()
+    private let modelContainer = StageFlowPersistence.container
 
     var body: some Scene {
         WindowGroup {
             ProjectsView()
                 .preferredColorScheme(.dark)
                 .task {
-                    PhoneWatchSessionManager.shared.configure(modelContainer: modelContainer)
+                    PhoneWatchSessionManager.shared.configure(
+                        modelContainer: modelContainer
+                    )
                 }
         }
         .modelContainer(modelContainer)
