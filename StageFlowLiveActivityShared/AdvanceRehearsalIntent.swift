@@ -2,8 +2,8 @@ import AppIntents
 import Foundation
 
 struct AdvanceRehearsalIntent: LiveActivityIntent {
-    static var title: LocalizedStringResource = "Дальше"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Дальше"
+    static let description = IntentDescription(
         "Завершает текущий блок и запускает следующий."
     )
 
