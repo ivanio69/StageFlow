@@ -5,10 +5,12 @@ options:
     iOS: "18.0"
     watchOS: "11.0"
   createIntermediateGroups: true
+
 settings:
   base:
     SWIFT_VERSION: 6.0
     GENERATE_INFOPLIST_FILE: YES
+
 targets:
   StageFlow:
     type: application
@@ -64,3 +66,4 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.stageflow999.app.liveactivity
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) LIVE_ACTIVITY_EXTENSION"
