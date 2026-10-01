@@ -10,521 +10,328 @@ struct StageFlowLiveActivityBundle: WidgetBundle {
     }
 }
 
+// Explicit foregrounds keep the dark stage card legible with either system appearance.
+private enum CueStyle {
+    static let background = Color(red: 0.055, green: 0.065, blue: 0.08)
+    static let accent = Color(red: 0.70, green: 0.94, blue: 0.62)
+    static let secondary = Color.white.opacity(0.66)
+    static let muted = Color.white.opacity(0.48)
+}
+
 struct RehearsalLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(
-            for: RehearsalActivityAttributes.self
-        ) { context in
-            lockScreenView(context)
-                .activityBackgroundTint(.black.opacity(0.94))
+        ActivityConfiguration(for: RehearsalActivityAttributes.self) { context in
+            RehearsalCueCard(attributes: context.attributes, state: context.state)
+                .activityBackgroundTint(CueStyle.background)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text(context.attributes.rehearsalTitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-
-                        Text(context.state.blockTitle)
+                    Label(context.state.phase, systemImage: context.state.symbol)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(CueStyle.accent)
+                        .padding(.leading, 4)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    CueClock(state: context.state, size: 23, compact: true)
+                        .foregroundStyle(.white)
+                        .padding(.trailing, 4)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(context.state.isFinished ? "Репетиция завершена" : context.state.blockTitle)
                             .font(.headline)
+                            .foregroundStyle(.white)
                             .lineLimit(2)
                             .invalidatableContent()
+                        if !context.state.isFinished {
+                            CueProgress(state: context.state)
+                            CueNextRow(attributes: context.attributes, state: context.state, compact: true)
+                        } else {
+                            Text(context.attributes.rehearsalTitle)
+                                .font(.caption)
+                                .foregroundStyle(CueStyle.secondary)
+                                .lineLimit(1)
+                        }
                     }
-                    .padding(.leading, 3)
+                    .padding(.horizontal, 4)
+                    .padding(.top, 3)
                 }
+            } compactLeading: {
+                Image(systemName: context.state.symbol)
+                    .font(.caption2.bold())
+                    .foregroundStyle(CueStyle.accent)
+                    .accessibilityLabel(context.state.phase)
+            } compactTrailing: {
+                CueClock(state: context.state, size: 12, compact: true)
+                    .foregroundStyle(CueStyle.accent)
+            } minimal: {
+                Image(systemName: context.state.symbol)
+                    .foregroundStyle(CueStyle.accent)
+                    .accessibilityLabel(context.state.phase)
+            }
+            .keylineTint(CueStyle.accent)
+        }
+    }
+}
 
-                DynamicIslandExpandedRegion(.trailing) {
-                    VStack(
-                        alignment: .trailing,
-                        spacing: 3
-                    ) {
-                        liveTimer(
-                            context.state,
-                            compact: false
-                        )
-                        .font(
-                            .system(
-                                size: 22,
-                                weight: .semibold,
-                                design: .rounded
-                            )
-                        )
+private struct RehearsalCueCard: View {
+    let attributes: RehearsalActivityAttributes
+    let state: RehearsalActivityAttributes.ContentState
 
-                        deltaTextView(
-                            context.state.scheduleDeltaSeconds,
-                            compact: true
-                        )
+    var body: some View {
+        Group {
+            if state.isFinished {
+                finished
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "waveform.path")
+                            .foregroundStyle(CueStyle.accent)
+                        Text(attributes.rehearsalTitle)
+                            .foregroundStyle(CueStyle.secondary)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        drift
+                            .fixedSize()
                     }
-                    .padding(.trailing, 3)
-                }
+                    .font(.caption2.weight(.medium))
 
-                DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 9) {
-                        progressView(context.state)
+                    HStack(alignment: .center, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(state.phase.uppercased())
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(1.4)
+                                .foregroundStyle(CueStyle.accent)
+                            Text(state.blockTitle)
+                                .font(.system(size: 16, weight: .semibold))
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.85)
+                                .invalidatableContent()
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                        HStack(
-                            alignment: .center,
-                            spacing: 10
-                        ) {
-                            nextCueCard(
-                                context.state,
-                                compact: true
-                            )
-                            .invalidatableContent()
-
-                            if !context.state.isFinished {
-                                advanceButton(
-                                    context,
-                                    compact: true
-                                )
+                        VStack(alignment: .trailing, spacing: 4) {
+                            CueClock(state: state, size: 30, compact: false)
+                            if let end = state.plannedEnd {
+                                Text("до \(end.formatted(date: .omitted, time: .shortened)) по плану")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(CueStyle.secondary)
+                                    .monospacedDigit()
                             }
                         }
                     }
-                    .padding(.horizontal, 3)
-                    .padding(.top, 4)
+                    CueProgress(state: state)
+                    CueNextRow(attributes: attributes, state: state, compact: false)
                 }
-            } compactLeading: {
-                Image(
-                    systemName: context.state.isFinished
-                        ? "checkmark"
-                        : "play.fill"
-                )
-                .font(.caption2.bold())
-            } compactTrailing: {
-                liveTimer(
-                    context.state,
-                    compact: true
-                )
-            } minimal: {
-                Image(
-                    systemName: context.state.isFinished
-                        ? "checkmark"
-                        : "play.fill"
-                )
             }
         }
-    }
-
-    @ViewBuilder
-    private func lockScreenView(
-        _ context: ActivityViewContext<
-            RehearsalActivityAttributes
-        >
-    ) -> some View {
-        if context.state.isFinished {
-            finishedView(context)
-        } else {
-            VStack(
-                alignment: .leading,
-                spacing: 11
-            ) {
-                header(context)
-
-                Text(context.state.blockTitle)
-                    .font(.title3.weight(.semibold))
-                    .lineLimit(2)
-                    .invalidatableContent()
-
-                HStack(
-                    alignment: .firstTextBaseline,
-                    spacing: 10
-                ) {
-                    liveTimer(
-                        context.state,
-                        compact: false
-                    )
-                    .font(
-                        .system(
-                            size: 32,
-                            weight: .semibold,
-                            design: .rounded
-                        )
-                    )
-
-                    Spacer(minLength: 8)
-
-                    if let end = context.state.plannedEnd {
-                        VStack(
-                            alignment: .trailing,
-                            spacing: 1
-                        ) {
-                            Text("план")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-
-                            Text(
-                                end.formatted(
-                                    date: .omitted,
-                                    time: .shortened
-                                )
-                            )
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                        }
-                    }
-                }
-
-                progressView(context.state)
-
-                HStack(
-                    alignment: .center,
-                    spacing: 10
-                ) {
-                    nextCueCard(
-                        context.state,
-                        compact: false
-                    )
-                    .invalidatableContent()
-
-                    advanceButton(
-                        context,
-                        compact: false
-                    )
-                }
-
-                footer(context.state)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 13)
-            .padding(.bottom, 14)
-        }
-    }
-
-    private func header(
-        _ context: ActivityViewContext<
-            RehearsalActivityAttributes
-        >
-    ) -> some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(.white.opacity(0.9))
-                    .frame(width: 5, height: 5)
-
-                Text(context.attributes.rehearsalTitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 8)
-
-            deltaTextView(
-                context.state.scheduleDeltaSeconds,
-                compact: false
+        .foregroundStyle(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(alignment: .topLeading) {
+            LinearGradient(
+                colors: [CueStyle.accent.opacity(0.075), .clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
         }
     }
 
-    private func finishedView(
-        _ context: ActivityViewContext<
-            RehearsalActivityAttributes
-        >
-    ) -> some View {
+    private var drift: some View {
+        let minutes = Int((abs(state.scheduleDeltaSeconds) / 60).rounded())
+        let late = state.scheduleDeltaSeconds > 0
+        let color = minutes == 0 ? CueStyle.secondary : (late ? Color.orange : CueStyle.accent)
+        return HStack(spacing: 4) {
+            Image(systemName: minutes == 0 ? "checkmark" : (late ? "arrow.up.right" : "arrow.down.right"))
+            Text(minutes == 0 ? "По графику" : "\(late ? "+" : "−")\(minutes) мин")
+                .monospacedDigit()
+        }
+        .foregroundStyle(color)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(minutes == 0 ? "По графику" : "\(late ? "Отставание" : "Опережение") на \(minutes) минут")
+    }
+
+    private var finished: some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(.green.opacity(0.14))
-                    .frame(width: 38, height: 38)
-
-                Image(systemName: "checkmark")
-                    .font(.headline.bold())
-                    .foregroundStyle(.green)
-            }
-
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
-                Text(context.attributes.rehearsalTitle)
+            Image(systemName: "checkmark")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(CueStyle.accent)
+                .frame(width: 44, height: 44)
+                .background(CueStyle.accent.opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(attributes.rehearsalTitle)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CueStyle.secondary)
                     .lineLimit(1)
-
                 Text("Репетиция завершена")
                     .font(.headline)
-
-                if let finishedAt = context.state.predictedFinish {
-                    Text(
-                        finishedAt.formatted(
-                            date: .omitted,
-                            time: .shortened
-                        )
-                    )
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                if let end = state.predictedFinish {
+                    Text("Финиш в \(end.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(CueStyle.secondary)
                 }
             }
-
-            Spacer()
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-    }
-
-    @ViewBuilder
-    private func progressView(
-        _ state: RehearsalActivityAttributes
-            .ContentState
-    ) -> some View {
-        if state.isRunning,
-           let actualStart = state.actualStart,
-           let plannedStart = state.plannedStart,
-           let plannedEnd = state.plannedEnd {
-            let duration = max(
-                1,
-                plannedEnd.timeIntervalSince(plannedStart)
-            )
-            let expectedEnd = actualStart
-                .addingTimeInterval(duration)
-
-            ProgressView(
-                timerInterval: actualStart...expectedEnd,
-                countsDown: false
-            )
-            .progressViewStyle(.linear)
-            .tint(
-                deltaColor(
-                    state.scheduleDeltaSeconds
-                )
-            )
-            .frame(height: 3)
-        } else {
-            Capsule()
-                .fill(.white.opacity(0.1))
-                .frame(height: 3)
-        }
-    }
-
-    @ViewBuilder
-    private func nextCueCard(
-        _ state: RehearsalActivityAttributes
-            .ContentState,
-        compact: Bool
-    ) -> some View {
-        HStack(spacing: 9) {
-            ZStack {
-                RoundedRectangle(
-                    cornerRadius: compact ? 7 : 9
-                )
-                .fill(.white.opacity(0.08))
-                .frame(
-                    width: compact ? 28 : 34,
-                    height: compact ? 28 : 34
-                )
-
-                Image(
-                    systemName: state.nextBlockTitle == nil
-                        ? "checkered.flag"
-                        : "forward.fill"
-                )
-                .font(
-                    compact
-                        ? .caption2.bold()
-                        : .caption.bold()
-                )
-                .foregroundStyle(.secondary)
-            }
-
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
-                Text("Далее")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-
-                if let next = state.nextBlockTitle {
-                    HStack(spacing: 5) {
-                        Text(next)
-                            .font(
-                                compact
-                                    ? .caption.weight(.semibold)
-                                    : .subheadline.weight(.semibold)
-                            )
-                            .lineLimit(1)
-
-                        if let start = state.nextBlockStart {
-                            Text(
-                                start.formatted(
-                                    date: .omitted,
-                                    time: .shortened
-                                )
-                            )
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                } else {
-                    Text("Завершение")
-                        .font(
-                            compact
-                                ? .caption.weight(.semibold)
-                                : .subheadline.weight(.semibold)
-                        )
-                        .lineLimit(1)
-                }
-            }
-        }
-        .padding(.horizontal, compact ? 8 : 10)
-        .padding(.vertical, compact ? 6 : 8)
-        .background(
-            .white.opacity(0.045),
-            in: RoundedRectangle(
-                cornerRadius: compact ? 12 : 14
-            )
-        )
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
-        )
-    }
-
-    private func footer(
-        _ state: RehearsalActivityAttributes
-            .ContentState
-    ) -> some View {
-        HStack(spacing: 6) {
-            if let predicted = state.predictedFinish {
-                Image(systemName: "flag")
-                    .font(.caption2)
-
-                Text(
-                    "Финиш ~ \(predicted.formatted(date: .omitted, time: .shortened))"
-                )
-                .monospacedDigit()
-            }
-
-            Spacer()
-        }
-        .font(.caption2)
-        .foregroundStyle(.tertiary)
-    }
-
-    @ViewBuilder
-    private func liveTimer(
-        _ state: RehearsalActivityAttributes
-            .ContentState,
-        compact: Bool
-    ) -> some View {
-        if state.isRunning,
-           let actualStart = state.actualStart {
-            let horizon = actualStart
-                .addingTimeInterval(24 * 60 * 60)
-
-            Text(
-                timerInterval:
-                    actualStart...horizon,
-                countsDown: false,
-                showsHours: !compact
-            )
-            .font(
-                compact
-                    ? .caption2.bold().monospacedDigit()
-                    : .body.monospacedDigit()
-            )
-            .frame(
-                width: compact ? 48 : nil,
-                alignment: .trailing
-            )
-        } else {
-            Text("готов")
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func advanceButton(
-        _ context: ActivityViewContext<
-            RehearsalActivityAttributes
-        >,
-        compact: Bool
-    ) -> some View {
-        Button(
-            intent: AdvanceRehearsalIntent(
-                rehearsalID: context
-                    .attributes
-                    .rehearsalID
-                    .uuidString
-            )
-        ) {
-            if compact {
-                Image(systemName: "arrow.right")
-                    .font(.caption.bold())
-                    .frame(
-                        width: 30,
-                        height: 30
-                    )
-            } else {
-                HStack(spacing: 6) {
-                    Text("Дальше")
-                    Image(systemName: "arrow.right")
-                }
-                .font(.caption.bold())
-                .padding(.horizontal, 3)
-                .frame(height: 34)
-            }
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(.white.opacity(0.14))
-    }
-
-    private func deltaTextView(
-        _ seconds: TimeInterval,
-        compact: Bool
-    ) -> some View {
-        Text(deltaText(seconds))
-            .font(
-                compact
-                    ? .caption2.bold().monospacedDigit()
-                    : .caption.bold().monospacedDigit()
-            )
-            .foregroundStyle(deltaColor(seconds))
-            .padding(.horizontal, compact ? 0 : 8)
-            .padding(.vertical, compact ? 0 : 4)
-            .background {
-                if !compact {
-                    Capsule()
-                        .fill(
-                            deltaColor(seconds)
-                                .opacity(0.1)
-                        )
-                }
-            }
-    }
-
-    private func deltaText(
-        _ seconds: TimeInterval
-    ) -> String {
-        let minutes = Int(
-            (abs(seconds) / 60).rounded()
-        )
-
-        guard minutes > 0 else {
-            return "по графику"
-        }
-
-        return seconds > 0
-            ? "+\(minutes) мин"
-            : "−\(minutes) мин"
-    }
-
-    private func deltaColor(
-        _ seconds: TimeInterval
-    ) -> Color {
-        if seconds > 30 {
-            return .orange
-        }
-
-        if seconds < -30 {
-            return .green
-        }
-
-        return .secondary
     }
 }
+
+private struct CueClock: View {
+    let state: RehearsalActivityAttributes.ContentState
+    let size: CGFloat
+    let compact: Bool
+
+    var body: some View {
+        Group {
+            if state.isFinished {
+                Image(systemName: "checkmark")
+            } else if state.isRunning, let start = state.actualStart {
+                // System-rendered text keeps ticking while the app is suspended.
+                Text(timerInterval: start...start.addingTimeInterval(24 * 60 * 60),
+                     countsDown: false, showsHours: true)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: compact ? 64 : 126, alignment: .trailing)
+                    .accessibilityLabel("Прошло времени")
+            } else {
+                Text(compact ? "Старт" : "—:—")
+            }
+        }
+        .font(.system(size: size, weight: .medium, design: .rounded).monospacedDigit())
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
+    }
+}
+
+private struct CueProgress: View {
+    let state: RehearsalActivityAttributes.ContentState
+
+    var body: some View {
+        Group {
+            if state.isRunning,
+               let actual = state.actualStart,
+               let start = state.plannedStart,
+               let end = state.plannedEnd {
+                ProgressView(timerInterval: actual...actual.addingTimeInterval(max(1, end.timeIntervalSince(start))), countsDown: false) {
+                    EmptyView()
+                } currentValueLabel: {
+                    EmptyView()
+                }
+                .progressViewStyle(.linear)
+                .tint(CueStyle.accent)
+                .accessibilityLabel("Прогресс текущего блока")
+            } else {
+                Capsule().fill(.white.opacity(0.12))
+            }
+        }
+        .frame(height: 3)
+        .clipShape(Capsule())
+    }
+}
+
+private struct CueNextRow: View {
+    let attributes: RehearsalActivityAttributes
+    let state: RehearsalActivityAttributes.ContentState
+    let compact: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text(state.nextBlockTitle == nil ? "ФИНИШ" : "ДАЛЕЕ")
+                        .tracking(1)
+                    if let start = state.nextBlockStart, state.nextBlockTitle != nil {
+                        Text("· \(start.formatted(date: .omitted, time: .shortened))")
+                            .monospacedDigit()
+                    } else if let finish = state.predictedFinish {
+                        Text("≈ \(finish.formatted(date: .omitted, time: .shortened))")
+                            .monospacedDigit()
+                    }
+                }
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(CueStyle.muted)
+                .lineLimit(1)
+                Text(state.nextBlockTitle ?? "Последний блок")
+                    .font(.system(size: compact ? 12 : 13, weight: .medium))
+                    .foregroundStyle(CueStyle.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .invalidatableContent()
+
+            Button(intent: AdvanceRehearsalIntent(rehearsalID: attributes.rehearsalID.uuidString)) {
+                HStack(spacing: 6) {
+                    if !compact {
+                        Text(state.actionTitle)
+                    }
+                    Image(systemName: state.actionSymbol)
+                }
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(CueStyle.background)
+                .padding(.horizontal, compact ? 0 : 14)
+                .frame(minWidth: 44, minHeight: 44)
+                .background(CueStyle.accent, in: Capsule())
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+            .accessibilityLabel(state.actionTitle)
+            .accessibilityHint(state.isRunning ? "Завершить текущий блок\(state.nextBlockTitle == nil ? " и репетицию" : " и начать следующий")" : "Запустить текущий блок")
+        }
+    }
+}
+
+private extension RehearsalActivityAttributes.ContentState {
+    var phase: String { isFinished ? "Завершено" : (isRunning ? "Сейчас" : "Готовы к старту") }
+    var symbol: String { isFinished ? "checkmark" : (isRunning ? "waveform" : "play.fill") }
+    var actionTitle: String { !isRunning ? "Начать" : (nextBlockTitle == nil ? "Завершить" : "Дальше") }
+    var actionSymbol: String { !isRunning ? "play.fill" : (nextBlockTitle == nil ? "checkmark" : "arrow.right") }
+}
+
+#if DEBUG
+private enum CuePreview {
+    static let attributes = RehearsalActivityAttributes(rehearsalID: UUID(), rehearsalTitle: "Большая сцена · Прогон")
+
+    static func state(running: Bool = true, finished: Bool = false, last: Bool = false, longTitle: Bool = false) -> RehearsalActivityAttributes.ContentState {
+        let now = Date()
+        return .init(
+            blockTitle: longTitle ? "Финальная сцена с полным составом и оркестром" : "Свет и пластика",
+            plannedStart: now.addingTimeInterval(-300),
+            plannedEnd: now.addingTimeInterval(600),
+            actualStart: running && !finished ? now.addingTimeInterval(-240) : nil,
+            scheduleDeltaSeconds: longTitle ? 420 : 0,
+            predictedFinish: finished ? now : now.addingTimeInterval(1800),
+            nextBlockTitle: last || finished ? nil : "Финальный выход",
+            nextBlockStart: last || finished ? nil : now.addingTimeInterval(660),
+            isRunning: running && !finished,
+            isFinished: finished
+        )
+    }
+}
+
+#Preview("Экран блокировки", as: .content, using: CuePreview.attributes) {
+    RehearsalLiveActivityWidget()
+} contentStates: {
+    CuePreview.state()
+    CuePreview.state(running: false)
+    CuePreview.state(last: true)
+    CuePreview.state(longTitle: true)
+    CuePreview.state(finished: true)
+}
+
+#Preview("Остров · развёрнутый", as: .dynamicIsland(.expanded), using: CuePreview.attributes) {
+    RehearsalLiveActivityWidget()
+} contentStates: {
+    CuePreview.state()
+    CuePreview.state(longTitle: true)
+    CuePreview.state(finished: true)
+}
+
+#Preview("Остров · компактный", as: .dynamicIsland(.compact), using: CuePreview.attributes) {
+    RehearsalLiveActivityWidget()
+} contentStates: {
+    CuePreview.state()
+    CuePreview.state(running: false)
+    CuePreview.state(finished: true)
+}
+#endif
