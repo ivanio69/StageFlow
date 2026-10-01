@@ -1,328 +1,241 @@
 import SwiftUI
 
+private enum WatchCueStyle {
+    static let background = Color(red: 0.055, green: 0.065, blue: 0.08)
+    static let accent = Color(red: 0.70, green: 0.94, blue: 0.62)
+    static let secondary = Color.white.opacity(0.66)
+}
+
 struct CurrentBlockView: View {
     let session: WatchSessionManager
-
     @State private var showingNote = false
     @State private var noteText = ""
 
-    private var snapshot: WatchSnapshot {
-        session.snapshot
-    }
+    private var snapshot: WatchSnapshot { session.snapshot }
+    private var isActive: Bool { snapshot.mode == .ready || snapshot.mode == .running }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                header
-
-                Text(snapshot.blockTitle)
-                    .font(.title3.bold())
-                    .lineLimit(3)
-
-                HStack(alignment: .firstTextBaseline) {
-                    Text(deltaText)
-                        .font(
-                            .system(
-                                .title2,
-                                design: .rounded,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(deltaColor)
-
-                    Spacer()
-
-                    if let plannedEnd = snapshot.plannedEnd {
-                        Text(
-                            plannedEnd.formatted(
-                                date: .omitted,
-                                time: .shortened
-                            )
-                        )
-                        .font(.footnote.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                    }
+            VStack(alignment: .leading, spacing: 14) {
+                Label(snapshot.rehearsalTitle, systemImage: "waveform.path")
+                    .font(.caption2)
+                    .foregroundStyle(WatchCueStyle.secondary)
+                    .lineLimit(2)
+                if isActive {
+                    cue
+                    primaryAction
+                    nextCue
+                    secondaryActions
+                } else {
+                    restingState
                 }
-
-                if snapshot.mode == .running {
-                    TimelineView(
-                        .periodic(from: .now, by: 1)
-                    ) { context in
-                        VStack(
-                            alignment: .leading,
-                            spacing: 5
-                        ) {
-                            ProgressView(
-                                value: progress(at: context.date)
-                            )
-
-                            Text(
-                                remainingText(at: context.date)
-                            )
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                if let next = snapshot.nextBlockTitle {
-                    Divider()
-
-                    Text("Далее")
+                if !session.isPhoneReachable {
+                    Label("Нет связи с iPhone", systemImage: "iphone.slash")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    Text(next)
-                        .font(.footnote.weight(.semibold))
-                        .lineLimit(2)
+                        .foregroundStyle(WatchCueStyle.secondary)
                 }
-
-                primaryAction
-
-                if snapshot.mode == .ready {
-                    Button(role: .destructive) {
-                        session.skipNextBlock()
-                    } label: {
-                        Label(
-                            "Пропустить",
-                            systemImage: "forward.end"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!session.isPhoneReachable)
-                }
-
-                if snapshot.mode == .ready
-                    || snapshot.mode == .running {
-                    Button {
-                        showingNote = true
-                    } label: {
-                        Label(
-                            "Заметка",
-                            systemImage: "mic.fill"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                }
-
                 if let status = session.statusMessage {
                     Text(status)
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .frame(
-                            maxWidth: .infinity,
-                            alignment: .center
-                        )
+                        .foregroundStyle(WatchCueStyle.secondary)
                 }
             }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 12)
         }
-        .sheet(isPresented: $showingNote) {
-            noteComposer
+        .foregroundStyle(.white)
+        .background(WatchCueStyle.background.ignoresSafeArea())
+        .tint(WatchCueStyle.accent)
+        .sheet(isPresented: $showingNote) { noteComposer }
+    }
+
+    private var cue: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(snapshot.mode == .running ? "СЕЙЧАС" : "ГОТОВЫ К СТАРТУ")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(1.2)
+                .foregroundStyle(WatchCueStyle.accent)
+            Text(snapshot.blockTitle)
+                .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if snapshot.mode == .running, let start = snapshot.actualStart {
+                    Text(timerInterval: start...start.addingTimeInterval(24 * 60 * 60),
+                         countsDown: false, showsHours: true)
+                        .multilineTextAlignment(.leading)
+                } else {
+                    Text("—:—")
+                        .foregroundStyle(WatchCueStyle.secondary)
+                        .accessibilityLabel("Блок ещё не начат")
+                }
+            }
+            .font(.system(size: 38, weight: .medium, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    drift
+                    Spacer(minLength: 0)
+                    plannedEnd
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    drift
+                    plannedEnd
+                }
+            }
+            .font(.caption2)
+
+            if snapshot.mode == .running {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    ProgressView(value: progress(at: context.date))
+                        .tint(WatchCueStyle.accent)
+                        .accessibilityLabel("Прогресс текущего блока")
+                }
+            } else {
+                Capsule().fill(.white.opacity(0.12))
+                    .frame(height: 3)
+                    .accessibilityHidden(true)
+            }
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 6) {
-            Text(snapshot.rehearsalTitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+    private var drift: some View {
+        let minutes = Int((abs(snapshot.scheduleDeltaSeconds) / 60).rounded())
+        let late = snapshot.scheduleDeltaSeconds > 0
+        return Label {
+            Text(minutes == 0 ? "По графику" : "\(late ? "+" : "−")\(minutes) мин")
+                .monospacedDigit()
+        } icon: {
+            Image(systemName: minutes == 0 ? "checkmark" : (late ? "arrow.up.right" : "arrow.down.right"))
+        }
+        .foregroundStyle(minutes == 0 ? WatchCueStyle.secondary : (late ? .orange : WatchCueStyle.accent))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(minutes == 0 ? "По графику" : "\(late ? "Отставание" : "Опережение") на \(minutes) минут")
+    }
 
-            Spacer()
-
-            Circle()
-                .fill(
-                    session.isPhoneReachable
-                        ? Color.green
-                        : Color.secondary
-                )
-                .frame(width: 6, height: 6)
+    @ViewBuilder private var plannedEnd: some View {
+        if let end = snapshot.plannedEnd {
+            Text("до \(end.formatted(date: .omitted, time: .shortened))")
+                .monospacedDigit()
+                .foregroundStyle(WatchCueStyle.secondary)
+                .accessibilityLabel("По плану до \(end.formatted(date: .omitted, time: .shortened))")
         }
     }
 
-    @ViewBuilder
     private var primaryAction: some View {
-        switch snapshot.mode {
-        case .running:
-            Button {
+        Button {
+            if snapshot.mode == .running {
                 session.finishCurrentBlock()
-            } label: {
-                Label(
-                    "Завершить",
-                    systemImage: "checkmark"
-                )
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!session.isPhoneReachable)
-
-        case .ready:
-            Button {
+            } else {
                 session.startNextBlock()
-            } label: {
-                Label(
-                    "Начать",
-                    systemImage: "play.fill"
-                )
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(!session.isPhoneReachable)
-
-        case .finished:
-            Label(
-                "На сегодня всё",
-                systemImage: "checkmark.seal.fill"
-            )
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.green)
-            .frame(maxWidth: .infinity)
-
-        case .idle:
-            Text("Нет активного графика")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
+        } label: {
+            Label(snapshot.mode == .running ? "Завершить" : "Начать",
+                  systemImage: snapshot.mode == .running ? "checkmark" : "play.fill")
+                .font(.body.bold())
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .foregroundStyle(WatchCueStyle.background)
+                .background(WatchCueStyle.accent, in: Capsule())
         }
+        .buttonStyle(.plain)
+        .disabled(!session.isPhoneReachable)
+        .opacity(session.isPhoneReachable ? 1 : 0.4)
+        .accessibilityHint(snapshot.mode == .running ? "Завершить текущий блок" : "Начать текущий блок")
+    }
+
+    private var nextCue: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if let next = snapshot.nextBlockTitle {
+                Text("ДАЛЕЕ")
+                    .font(.system(size: 10, weight: .medium))
+                    .tracking(1)
+                    .foregroundStyle(WatchCueStyle.secondary)
+                Text(next)
+                    .font(.footnote.weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if snapshot.mode == .running {
+                Label("Последний блок", systemImage: "flag.checkered")
+                    .font(.footnote)
+            }
+            if let finish = snapshot.predictedFinish {
+                Text("Финиш ≈ \(finish.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(WatchCueStyle.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var secondaryActions: some View {
+        VStack(spacing: 6) {
+            Button { showingNote = true } label: {
+                Label("Заметка", systemImage: "square.and.pencil")
+                    .frame(maxWidth: .infinity, minHeight: 32)
+            }
+            if snapshot.mode == .ready {
+                Button(role: .destructive) { session.skipNextBlock() } label: {
+                    Label("Пропустить", systemImage: "forward.end")
+                        .frame(maxWidth: .infinity, minHeight: 32)
+                }
+                .disabled(!session.isPhoneReachable)
+            }
+        }
+        .font(.footnote)
+        .buttonStyle(.bordered)
+        .tint(.white.opacity(0.1))
+    }
+
+    private var restingState: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: snapshot.mode == .finished ? "checkmark" : "iphone")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(WatchCueStyle.accent)
+                .frame(width: 48, height: 48)
+                .background(WatchCueStyle.accent.opacity(0.12), in: Circle())
+            Text(snapshot.mode == .finished ? "Репетиция завершена" : snapshot.blockTitle)
+                .font(.headline)
+            Text(snapshot.mode == .finished ? "На сегодня всё" : "Выберите график на iPhone — он появится здесь.")
+                .font(.footnote)
+                .foregroundStyle(WatchCueStyle.secondary)
+        }
+        .padding(.vertical, 8)
     }
 
     private var noteComposer: some View {
         NavigationStack {
-            VStack(spacing: 10) {
-                TextField(
-                    "Заметка",
-                    text: $noteText
-                )
-                .textInputAutocapitalization(.sentences)
-
-                Button {
-                    session.addNote(noteText)
-                    noteText = ""
-                    showingNote = false
-                } label: {
-                    Label(
-                        "Сохранить",
-                        systemImage: "checkmark"
-                    )
-                    .frame(maxWidth: .infinity)
+            ScrollView {
+                VStack(spacing: 10) {
+                    TextField("Заметка", text: $noteText)
+                        .textInputAutocapitalization(.sentences)
+                    Button {
+                        session.addNote(noteText)
+                        noteText = ""
+                        showingNote = false
+                    } label: {
+                        Label("Сохранить", systemImage: "checkmark")
+                            .frame(maxWidth: .infinity)
+                            .foregroundStyle(WatchCueStyle.background)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(WatchCueStyle.accent)
+                    .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Отмена") { showingNote = false }
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(
-                    noteText.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty
-                )
-
-                Button("Отмена") {
-                    showingNote = false
-                }
+                .padding(.horizontal, 4)
             }
-            .padding(.horizontal, 4)
             .navigationTitle("Заметка")
         }
     }
 
-    private var deltaText: String {
-        let minutes = Int(
-            (abs(snapshot.scheduleDeltaSeconds) / 60)
-                .rounded()
-        )
-
-        guard minutes > 0 else {
-            return "По графику"
-        }
-
-        return snapshot.scheduleDeltaSeconds > 0
-            ? "+\(minutes) мин"
-            : "−\(minutes) мин"
-    }
-
-    private var deltaColor: Color {
-        if snapshot.scheduleDeltaSeconds > 30 {
-            return .orange
-        }
-
-        if snapshot.scheduleDeltaSeconds < -30 {
-            return .green
-        }
-
-        return .secondary
-    }
-
-    private func progress(
-        at date: Date
-    ) -> Double {
+    private func progress(at date: Date) -> Double {
         guard let actualStart = snapshot.actualStart,
               let plannedStart = snapshot.plannedStart,
-              let plannedEnd = snapshot.plannedEnd else {
-            return 0
-        }
-
-        let duration = plannedEnd.timeIntervalSince(
-            plannedStart
-        )
-
+              let plannedEnd = snapshot.plannedEnd else { return 0 }
+        let duration = plannedEnd.timeIntervalSince(plannedStart)
         guard duration > 0 else { return 0 }
-
-        let elapsed = date.timeIntervalSince(actualStart)
-
-        return min(
-            max(elapsed / duration, 0),
-            1
-        )
-    }
-
-    private func remainingText(
-        at date: Date
-    ) -> String {
-        guard let actualStart = snapshot.actualStart,
-              let plannedStart = snapshot.plannedStart,
-              let plannedEnd = snapshot.plannedEnd else {
-            return ""
-        }
-
-        let duration = plannedEnd.timeIntervalSince(
-            plannedStart
-        )
-
-        let expectedEnd = actualStart.addingTimeInterval(
-            duration
-        )
-
-        let remaining = expectedEnd.timeIntervalSince(
-            date
-        )
-
-        if remaining <= 0 {
-            let minutes = max(
-                1,
-                Int(
-                    (abs(remaining) / 60)
-                        .rounded()
-                )
-            )
-
-            return "+\(minutes) мин сверх длительности"
-        }
-
-        let minutes = Int(remaining / 60)
-        let seconds = Int(
-            remaining.truncatingRemainder(
-                dividingBy: 60
-            )
-        )
-
-        return String(
-            format: "%d:%02d осталось",
-            minutes,
-            seconds
-        )
+        return min(max(date.timeIntervalSince(actualStart) / duration, 0), 1)
     }
 }
