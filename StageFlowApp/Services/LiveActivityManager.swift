@@ -7,10 +7,6 @@ final class LiveActivityManager {
 
     private init() {}
 
-    private var activity: Activity<RehearsalActivityAttributes>? {
-        Activity<RehearsalActivityAttributes>.activities.first
-    }
-
     func startOrUpdate(
         rehearsal: Rehearsal,
         now: Date = Date()
@@ -26,10 +22,10 @@ final class LiveActivityManager {
 
         let content = ActivityContent(
             state: state,
-            staleDate: now.addingTimeInterval(120)
+            staleDate: now.addingTimeInterval(5 * 60)
         )
 
-        if let activity {
+        if let activity = activity(for: rehearsal.id) {
             nonisolated(unsafe) let activeActivity = activity
             await activeActivity.update(content)
             return
@@ -56,7 +52,9 @@ final class LiveActivityManager {
         rehearsal: Rehearsal,
         now: Date = Date()
     ) async {
-        guard let activity else { return }
+        guard let activity = activity(for: rehearsal.id) else {
+            return
+        }
 
         let state = contentState(
             for: rehearsal,
@@ -79,6 +77,16 @@ final class LiveActivityManager {
         )
     }
 
+    private func activity(
+        for rehearsalID: UUID
+    ) -> Activity<RehearsalActivityAttributes>? {
+        Activity<RehearsalActivityAttributes>
+            .activities
+            .first(where: {
+                $0.attributes.rehearsalID == rehearsalID
+            })
+    }
+
     private func contentState(
         for rehearsal: Rehearsal,
         now: Date,
@@ -92,31 +100,45 @@ final class LiveActivityManager {
             in: rehearsal
         )
 
+        let displayed = current ?? next
+
+        let following = displayed.flatMap { displayedBlock in
+            rehearsal.sortedBlocks.first(where: {
+                $0.orderIndex > displayedBlock.orderIndex
+                    && $0.status == .planned
+            })
+        }
+
         let isFinished = forceFinished
             || (current == nil && next == nil)
 
+        let nextStart = following.map {
+            ScheduleEngine.projectedStart(
+                for: $0,
+                in: rehearsal,
+                now: now
+            )
+        }
+
         return .init(
-            blockTitle: current?.title
-                ?? next?.title
+            blockTitle: displayed?.title
                 ?? "На сегодня всё",
-            plannedStart: current?.plannedStart
-                ?? next?.plannedStart,
-            plannedEnd: current?.plannedEnd
-                ?? next?.plannedEnd,
+            plannedStart: displayed?.plannedStart,
+            plannedEnd: displayed?.plannedEnd,
+            actualStart: current?.actualStart,
             scheduleDeltaSeconds: ScheduleEngine.scheduleDelta(
                 in: rehearsal,
                 now: now
             ),
-            predictedFinish: ScheduleEngine.predictedFinish(
-                in: rehearsal,
-                now: now
-            ),
-            nextBlockTitle: current.flatMap { running in
-                rehearsal.sortedBlocks.first(where: {
-                    $0.orderIndex > running.orderIndex
-                        && $0.status == .planned
-                })?.title
-            },
+            predictedFinish: isFinished
+                ? rehearsal.actualEnd
+                : ScheduleEngine.predictedFinish(
+                    in: rehearsal,
+                    now: now
+                ),
+            nextBlockTitle: following?.title,
+            nextBlockStart: nextStart,
+            isRunning: current != nil,
             isFinished: isFinished
         )
     }
